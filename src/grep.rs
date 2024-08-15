@@ -7,7 +7,7 @@ use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
 use ignore::{types::TypesBuilder, WalkBuilder};
 
-const PATTERN: &str = "#[derive(";
+const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
 #[derive(Debug)]
 pub struct Match {
@@ -70,10 +70,7 @@ impl<'a> Sink for SearchSink<'a> {
 }
 
 fn grep_file(path: PathBuf, tx: &Sender<Result<Match, String>>) {
-    let matcher = RegexMatcherBuilder::new()
-        .fixed_strings(true)
-        .build(PATTERN)
-        .unwrap();
+    let matcher = RegexMatcherBuilder::new().build(PATTERN).unwrap();
 
     let mut searcher = SearcherBuilder::new().line_number(true).build();
     let sink = SearchSink {
