@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::mpsc::{self, Sender},
 };
@@ -9,13 +10,14 @@ use ignore::{types::TypesBuilder, WalkBuilder};
 
 const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
-#[derive(Debug)]
-pub struct Match {
-    pub file_path: PathBuf,
-    pub line_number: usize,
+pub type Matches = HashMap<PathBuf, HashSet<usize>>;
+
+struct Match {
+    file_path: PathBuf,
+    line_number: usize,
 }
 
-pub fn grep() -> Result<Vec<Match>, String> {
+pub fn grep() -> Result<Matches, String> {
     let (tx, rx) = mpsc::channel();
 
     let walker = WalkBuilder::new(".")
@@ -48,7 +50,16 @@ pub fn grep() -> Result<Vec<Match>, String> {
     });
 
     drop(tx);
-    rx.into_iter().collect()
+
+    let matches: Result<Vec<Match>, String> = rx.into_iter().collect();
+
+    matches.map(|ms| {
+        ms.into_iter()
+            .fold(HashMap::<PathBuf, HashSet<usize>>::new(), |mut acc, m| {
+                acc.entry(m.file_path).or_default().insert(m.line_number);
+                acc
+            })
+    })
 }
 
 struct SearchSink<'a> {
@@ -62,7 +73,7 @@ impl<'a> Sink for SearchSink<'a> {
     fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
         let m = Match {
             file_path: self.file_path.to_owned(),
-            line_number: mat.line_number().unwrap_or(0) as usize,
+            line_number: mat.line_number().unwrap() as usize,
         };
         self.tx.send(Ok(m)).unwrap();
         Ok(true)

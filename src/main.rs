@@ -4,7 +4,10 @@ use grep::grep;
 
 fn main() {
     let matches = grep().unwrap();
-    for m in matches {
-        println!("{:?}", m);
+
+    for (file_path, line_numbers) in matches {
+        for line_number in &line_numbers {
+            println!("{}:{}", file_path.display(), line_number);
+        }
     }
 }
