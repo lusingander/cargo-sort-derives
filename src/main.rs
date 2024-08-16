@@ -1,11 +1,12 @@
 mod grep;
 
-use std::{collections::HashSet, io::BufRead, path::PathBuf};
+use std::{collections::HashSet, io::BufRead, path::PathBuf, sync::LazyLock};
 
 use grep::grep;
 use regex::Regex;
 
 const PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
 
 fn process_file(file_path: PathBuf, line_numbers: HashSet<usize>) -> Result<(), std::io::Error> {
     let path = file_path.clone();
@@ -26,8 +27,7 @@ fn process_file(file_path: PathBuf, line_numbers: HashSet<usize>) -> Result<(), 
 }
 
 fn parse_derive_traits(line: &str) -> Vec<&str> {
-    let re = Regex::new(PATTERN).unwrap();
-    let caps = re.captures(line).unwrap();
+    let caps = RE.captures(line).unwrap();
     caps.get(1)
         .unwrap()
         .as_str()
