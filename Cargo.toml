@@ -5,8 +5,10 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.16", features = ["derive"] }
+console = "0.15.8"
 grep-matcher = "0.1.7"
 grep-regex = "0.1.12"
 grep-searcher = "0.1.13"
 ignore = "0.4.22"
 regex = "1.10.6"
+similar = "2.6.0"

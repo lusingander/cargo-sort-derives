@@ -1,10 +1,13 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::format,
     path::Path,
     sync::LazyLock,
 };
 
+use console::Style;
 use regex::Regex;
+use similar::{ChangeTag, TextDiff};
 
 use crate::ext::BufReadExt;
 
@@ -23,27 +26,38 @@ const DEFAULT_ORDER: &[&str; 9] = &[
 const PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
 
-pub fn process_file(file_path: &Path, line_numbers: HashSet<usize>) -> Result<(), std::io::Error> {
+pub fn process_file(
+    file_path: &Path,
+    line_numbers: HashSet<usize>,
+    check: bool,
+) -> Result<(), std::io::Error> {
     let file = std::fs::File::open(file_path)?;
     let reader = std::io::BufReader::new(file);
 
-    let mut lines = Vec::with_capacity(line_numbers.len());
+    let mut old_lines = Vec::with_capacity(line_numbers.len());
+    let mut new_lines = Vec::with_capacity(line_numbers.len());
 
     for (i, line) in reader.lines_with_terminator().enumerate() {
         let n = i + 1;
         let line = line?;
 
-        if line_numbers.contains(&n) {
+        let new_line = if line_numbers.contains(&n) {
             let derives = parse_derive_traits(&line);
             let sorted_derives = sort_derive_traits(&derives, DEFAULT_ORDER);
-            let new_line = replace_line(&line, &sorted_derives);
-            lines.push(new_line);
+            replace_line(&line, &sorted_derives)
         } else {
-            lines.push(line);
-        }
+            line.clone()
+        };
+
+        old_lines.push(line);
+        new_lines.push(new_line);
     }
 
-    std::fs::write(file_path, lines.concat())?;
+    if !check {
+        write_file(file_path, new_lines)?
+    } else {
+        print_diff(file_path, old_lines, new_lines);
+    }
 
     Ok(())
 }
@@ -86,6 +100,43 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
         .join(", ");
     let sorted_derive_str = format!("#[derive({})]", sorted_derive_str);
     RE.replace(line, sorted_derive_str).into()
+}
+
+fn write_file(file_path: &Path, new_lines: Vec<String>) -> Result<(), std::io::Error> {
+    std::fs::write(file_path, new_lines.concat())
+}
+
+fn print_diff(file_path: &Path, old_lines: Vec<String>, new_lines: Vec<String>) {
+    let old = old_lines.concat();
+    let new = new_lines.concat();
+    let diff = TextDiff::from_lines(&old, &new);
+
+    if diff.ratio() == 1.0 {
+        return;
+    }
+
+    for group in diff.grouped_ops(0).iter() {
+        for op in group {
+            for change in diff.iter_changes(op) {
+                if change.tag() == ChangeTag::Delete {
+                    // always consists of a pair of delete and insert lines, so we only need to print the file path once
+                    let line = format!(
+                        "--- {}:{}",
+                        file_path.display(),
+                        change.old_index().unwrap() + 1
+                    );
+                    println!("{}", Style::new().color256(244).apply_to(line));
+                }
+
+                let (line, style) = match change.tag() {
+                    ChangeTag::Delete => (format!("- {}", change.value()), Style::new().red()),
+                    ChangeTag::Insert => (format!("+ {}", change.value()), Style::new().green()),
+                    ChangeTag::Equal => (format!("  {}", change.value()), Style::new()),
+                };
+                print!("{}", style.apply_to(line));
+            }
+        }
+    }
 }
 
 #[cfg(test)]

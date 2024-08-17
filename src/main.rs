@@ -14,12 +14,16 @@ enum Cli {
 
 #[derive(Debug, Args)]
 #[command(version, about, long_about = None)]
-struct SortDerivesArgs {}
+struct SortDerivesArgs {
+    /// Check if the derive attributes are sorted
+    #[clap(long)]
+    check: bool,
+}
 
 fn main() {
-    let Cli::SortDerives(_args) = Cli::parse();
+    let Cli::SortDerives(args) = Cli::parse();
 
     for (file_path, line_numbers) in grep().unwrap() {
-        process_file(&file_path, line_numbers).unwrap();
+        process_file(&file_path, line_numbers, args.check).unwrap();
     }
 }
