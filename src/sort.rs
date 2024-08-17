@@ -10,24 +10,13 @@ use similar::{ChangeTag, TextDiff};
 
 use crate::ext::BufReadExt;
 
-const DEFAULT_ORDER: &[&str; 9] = &[
-    "Debug",
-    "Default",
-    "Clone",
-    "Copy",
-    "PartialEq",
-    "Eq",
-    "PartialOrd",
-    "Ord",
-    "Hash",
-];
-
 const PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
 
 pub fn process_file(
     file_path: &Path,
     line_numbers: HashSet<usize>,
+    order: &[&str],
     check: bool,
 ) -> Result<bool, std::io::Error> {
     let file = std::fs::File::open(file_path)?;
@@ -42,7 +31,7 @@ pub fn process_file(
 
         let new_line = if line_numbers.contains(&n) {
             let derives = parse_derive_traits(&line);
-            let sorted_derives = sort_derive_traits(&derives, DEFAULT_ORDER);
+            let sorted_derives = sort_derive_traits(&derives, order);
             replace_line(&line, &sorted_derives)
         } else {
             line.clone()
