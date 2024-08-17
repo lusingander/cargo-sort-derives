@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    fmt::format,
     path::Path,
     sync::LazyLock,
 };
@@ -30,7 +29,7 @@ pub fn process_file(
     file_path: &Path,
     line_numbers: HashSet<usize>,
     check: bool,
-) -> Result<(), std::io::Error> {
+) -> Result<bool, std::io::Error> {
     let file = std::fs::File::open(file_path)?;
     let reader = std::io::BufReader::new(file);
 
@@ -54,12 +53,20 @@ pub fn process_file(
     }
 
     if !check {
-        write_file(file_path, new_lines)?
-    } else {
-        print_diff(file_path, old_lines, new_lines);
+        write_file(file_path, new_lines)?;
+        return Ok(true);
     }
 
-    Ok(())
+    let diffs = calc_diff_lines(file_path, old_lines, new_lines);
+    if diffs.is_empty() {
+        return Ok(true);
+    }
+
+    for line in diffs {
+        print!("{}", line);
+    }
+
+    Ok(false)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,14 +113,21 @@ fn write_file(file_path: &Path, new_lines: Vec<String>) -> Result<(), std::io::E
     std::fs::write(file_path, new_lines.concat())
 }
 
-fn print_diff(file_path: &Path, old_lines: Vec<String>, new_lines: Vec<String>) {
+fn calc_diff_lines(
+    file_path: &Path,
+    old_lines: Vec<String>,
+    new_lines: Vec<String>,
+) -> Vec<String> {
     let old = old_lines.concat();
     let new = new_lines.concat();
     let diff = TextDiff::from_lines(&old, &new);
 
     if diff.ratio() == 1.0 {
-        return;
+        // no changes
+        return Vec::new();
     }
+
+    let mut lines = Vec::new();
 
     for group in diff.grouped_ops(0).iter() {
         for op in group {
@@ -121,11 +135,11 @@ fn print_diff(file_path: &Path, old_lines: Vec<String>, new_lines: Vec<String>) 
                 if change.tag() == ChangeTag::Delete {
                     // always consists of a pair of delete and insert lines, so we only need to print the file path once
                     let line = format!(
-                        "--- {}:{}",
+                        "--- {}:{}\n",
                         file_path.display(),
                         change.old_index().unwrap() + 1
                     );
-                    println!("{}", Style::new().color256(244).apply_to(line));
+                    lines.push(format!("{}", Style::new().color256(244).apply_to(line)));
                 }
 
                 let (line, style) = match change.tag() {
@@ -133,10 +147,12 @@ fn print_diff(file_path: &Path, old_lines: Vec<String>, new_lines: Vec<String>) 
                     ChangeTag::Insert => (format!("+ {}", change.value()), Style::new().green()),
                     ChangeTag::Equal => (format!("  {}", change.value()), Style::new()),
                 };
-                print!("{}", style.apply_to(line));
+                lines.push(format!("{}", style.apply_to(line)));
             }
         }
     }
+
+    lines
 }
 
 #[cfg(test)]

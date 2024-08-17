@@ -23,7 +23,12 @@ struct SortDerivesArgs {
 fn main() {
     let Cli::SortDerives(args) = Cli::parse();
 
+    let mut no_diff = true;
     for (file_path, line_numbers) in grep().unwrap() {
-        process_file(&file_path, line_numbers, args.check).unwrap();
+        no_diff &= process_file(&file_path, line_numbers, args.check).unwrap();
+    }
+
+    if !no_diff {
+        std::process::exit(1);
     }
 }
