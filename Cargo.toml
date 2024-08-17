@@ -2,6 +2,14 @@
 name = "cargo-sort-derives"
 version = "0.1.0"
 edition = "2021"
+description = "Cargo subcommand to sort derive attributes"
+authors = ["Kyosuke Fujimoto <kyoro.f@gmail.com>"]
+homepage = "https://github.com/lusingander/cargo-sort-derives"
+repository = "https://github.com/lusingander/cargo-sort-derives"
+readme = "README.md"
+license = "MIT"
+keywords = ["cargo", "subcommand", "plugin", "derive"]
+categories = ["development-tools::cargo-plugins", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.5.16", features = ["derive"] }
