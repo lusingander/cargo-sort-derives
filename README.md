@@ -23,6 +23,7 @@ Usage: cargo sort-derives [OPTIONS]
 
 Options:
   -o, --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
+                       Any derives not listed will appear at the end in alphabetical order by default
       --check          Check if the derive attributes are sorted
   -h, --help           Print help
   -V, --version        Print version
@@ -36,27 +37,39 @@ The following command sorts the `derive` attributes in the `.rs` files in the cu
 $ cargo sort-derives
 ```
 
+This will reorder the `derive` attributes as follows:
+
+```rs
+// Before:
+#[derive(Debug, Clone, Copy, Default, Eq)]
+struct Example;
+
+// After: sorted alphabetically
+#[derive(Clone, Copy, Debug, Default, Eq)]
+struct Example;
+```
+
+By default, it is sorted alphabetically.
+
 ### Specifying the order
 
 ```
-$ cargo sort-derives --order "Copy, Clone, Default"
+$ cargo sort-derives --order "Eq, Clone, Default"
 ```
 
 This will reorder the `derive` attributes as follows:
 
 ```rs
 // Before:
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, Eq)]
 struct Example;
 
-// After:
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+// After: "Eq, Clone, Default" are sorted in that order, the rest are sorted alphabetically
+#[derive(Eq, Clone, Default, Copy, Debug)]
 struct Example;
 ```
 
-Any derives not listed will appear at the end in their original order.
-
-If nothing is specified, the default order is `Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash`.
+Any derives not listed will appear at the end in alphabetical order.
 
 ### Check without updates
 
