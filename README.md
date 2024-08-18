@@ -31,6 +31,8 @@ Options:
 
 ### Basic
 
+<img src="./img/basic.gif" width=600>
+
 The following command sorts the `derive` attributes in the `.rs` files in the current directory:
 
 ```
@@ -53,6 +55,8 @@ By default, it is sorted alphabetically.
 
 ### Specifying the order
 
+<img src="./img/order.gif" width=600>
+
 ```
 $ cargo sort-derives --order "Eq, Clone, Default"
 ```
@@ -72,6 +76,8 @@ struct Example;
 Any derives not listed will appear at the end in alphabetical order.
 
 ### Check without updates
+
+<img src="./img/check.gif" width=600>
 
 ```
 $ cargo sort-derives --check
