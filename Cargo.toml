@@ -21,4 +21,6 @@ grep-regex = "0.1.12"
 grep-searcher = "0.1.13"
 ignore = "0.4.22"
 regex = "1.10.6"
+serde = { version = "1.0.208", features = ["derive"] }
 similar = "2.6.0"
+toml = "0.8.19"

@@ -87,6 +87,21 @@ This checks if the `derive` attributes in your `.rs` files are sorted correctly.
 
 If the attributes are out of order, the command will exit with a non-zero status code, indicating that the files need to be updated.
 
+### Config
+
+If `.sort-derives.toml` exists in the current directory, the config will be loaded.
+
+#### Format
+
+The `.sort-derives.toml` file uses the following format:
+
+```toml
+# Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
+# The command line option `--order` will override this setting if specified.
+# type: string
+order = "Eq, Clone, Default"
+```
+
 ## License
 
 MIT

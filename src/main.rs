@@ -1,8 +1,10 @@
+mod config;
 mod ext;
 mod grep;
 mod sort;
 
 use clap::{Args, Parser};
+use config::Config;
 use grep::grep;
 use sort::process_file;
 
@@ -25,14 +27,20 @@ struct SortDerivesArgs {
     check: bool,
 }
 
+fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<&'a str>> {
+    let order_str = args.order.as_deref().or(config.order.as_deref());
+    order_str.map(parse_order)
+}
+
 fn parse_order(order: &str) -> Vec<&str> {
     order.split(',').map(str::trim).collect()
 }
 
 fn main() {
     let Cli::SortDerives(args) = Cli::parse();
+    let config = Config::load();
 
-    let custom_order = args.order.as_deref().map(parse_order);
+    let custom_order = read_custom_order(&config, &args);
     let check = args.check;
 
     let mut no_diff = true;
