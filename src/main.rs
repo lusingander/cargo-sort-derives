@@ -3,7 +3,7 @@ mod ext;
 mod grep;
 mod sort;
 
-use clap::{Args, Parser};
+use clap::{Args, Parser, ValueEnum};
 use config::Config;
 use grep::grep;
 use sort::process_file;
@@ -29,6 +29,27 @@ struct SortDerivesArgs {
     /// Check if the derive attributes are sorted
     #[clap(long)]
     check: bool,
+
+    /// Use colored output
+    #[clap(long, value_name = "TYPE", default_value = "auto")]
+    color: Color,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum Color {
+    Auto,
+    Always,
+    Never,
+}
+
+impl From<Color> for sort::OutputColor {
+    fn from(color: Color) -> Self {
+        match color {
+            Color::Auto => sort::OutputColor::Auto,
+            Color::Always => sort::OutputColor::Always,
+            Color::Never => sort::OutputColor::Never,
+        }
+    }
 }
 
 fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<&'a str>> {
@@ -51,10 +72,19 @@ fn main() {
     let custom_order = read_custom_order(&config, &args);
     let preserve = read_preserve(&config, &args);
     let check = args.check;
+    let output_color = args.color.into();
 
     let mut no_diff = true;
     for (file_path, line_numbers) in grep().unwrap() {
-        no_diff &= process_file(&file_path, line_numbers, &custom_order, preserve, check).unwrap();
+        no_diff &= process_file(
+            &file_path,
+            line_numbers,
+            &custom_order,
+            preserve,
+            check,
+            output_color,
+        )
+        .unwrap();
     }
 
     if !no_diff {
