@@ -40,12 +40,16 @@ fn parse_order(order: &str) -> Vec<&str> {
     order.split(',').map(str::trim).collect()
 }
 
+fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
+    args.preserve || config.preserve.unwrap_or(false)
+}
+
 fn main() {
     let Cli::SortDerives(args) = Cli::parse();
     let config = Config::load();
 
     let custom_order = read_custom_order(&config, &args);
-    let preserve = args.preserve;
+    let preserve = read_preserve(&config, &args);
     let check = args.check;
 
     let mut no_diff = true;

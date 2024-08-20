@@ -5,6 +5,7 @@ const CONFIG_FILE_NAME: &str = ".sort-derives.toml";
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
     pub order: Option<String>,
+    pub preserve: Option<bool>,
 }
 
 impl Config {
