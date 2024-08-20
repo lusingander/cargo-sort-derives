@@ -19,7 +19,7 @@ enum Cli {
 struct SortDerivesArgs {
     /// Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
     /// Any derives not listed will appear at the end in alphabetical order by default
-    #[clap(short, long, value_name = "VALUE", verbatim_doc_comment)]
+    #[clap(long, value_name = "VALUE", verbatim_doc_comment)]
     order: Option<String>,
 
     /// Preserve the original order for unspecified derive attributes (only applies when --order is used)
