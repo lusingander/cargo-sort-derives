@@ -17,6 +17,7 @@ pub fn process_file(
     file_path: &Path,
     line_numbers: HashSet<usize>,
     custom_order: &Option<Vec<&str>>,
+    preserve: bool,
     check: bool,
 ) -> Result<bool, std::io::Error> {
     let file = std::fs::File::open(file_path)?;
@@ -31,7 +32,7 @@ pub fn process_file(
 
         let new_line = if line_numbers.contains(&n) {
             let derives = parse_derive_traits(&line);
-            let sorted_derives = sort_derive_traits(&derives, custom_order);
+            let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
             replace_line(&line, &sorted_derives)
         } else {
             line.clone()
@@ -84,10 +85,13 @@ fn parse_derive_traits(line: &str) -> Vec<DeriveTrait> {
 fn sort_derive_traits(
     derives: &[DeriveTrait],
     custom_order: &Option<Vec<&str>>,
+    preserve: bool,
 ) -> Vec<DeriveTrait> {
-    // sort by alphabetical order
     let mut sort_derives = derives.to_vec();
-    sort_derives.sort_by(|a, b| a.base_name.cmp(&b.base_name));
+    if !preserve {
+        // sort by alphabetical order
+        sort_derives.sort_by(|a, b| a.base_name.cmp(&b.base_name));
+    }
 
     if let Some(order) = custom_order {
         let order_map: HashMap<&str, usize> =
@@ -186,7 +190,7 @@ mod tests {
             dt("foo::bar::Bar", "Bar"),
         ];
         let order = None;
-        let actual = sort_derive_traits(&derives, &order);
+        let actual = sort_derive_traits(&derives, &order, false);
         let expected = vec![
             dt("foo::bar::Bar", "Bar"),
             dt("std::clone::Clone", "Clone"),
@@ -221,7 +225,7 @@ mod tests {
             "Ord",
             "Hash",
         ]);
-        let actual = sort_derive_traits(&derives, &order);
+        let actual = sort_derive_traits(&derives, &order, false);
         let expected = vec![
             dt("Debug", "Debug"),
             dt("std::clone::Clone", "Clone"),
@@ -230,6 +234,41 @@ mod tests {
             dt("Hash", "Hash"),
             dt("foo::bar::Bar", "Bar"),
             dt("Foo", "Foo"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_derive_traits_with_order_and_preserve() {
+        let derives = vec![
+            dt("Debug", "Debug"),
+            dt("cmp::Eq", "Eq"),
+            dt("Foo", "Foo"),
+            dt("std::clone::Clone", "Clone"),
+            dt("Hash", "Hash"),
+            dt("cmp::PartialOrd", "PartialOrd"),
+            dt("foo::bar::Bar", "Bar"),
+        ];
+        let order = Some(vec![
+            "Debug",
+            "Default",
+            "Clone",
+            "Copy",
+            "PartialEq",
+            "Eq",
+            "PartialOrd",
+            "Ord",
+            "Hash",
+        ]);
+        let actual = sort_derive_traits(&derives, &order, true);
+        let expected = vec![
+            dt("Debug", "Debug"),
+            dt("std::clone::Clone", "Clone"),
+            dt("cmp::Eq", "Eq"),
+            dt("cmp::PartialOrd", "PartialOrd"),
+            dt("Hash", "Hash"),
+            dt("Foo", "Foo"),
+            dt("foo::bar::Bar", "Bar"),
         ];
         assert_eq!(actual, expected);
     }

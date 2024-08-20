@@ -22,6 +22,10 @@ struct SortDerivesArgs {
     #[clap(short, long, value_name = "VALUE", verbatim_doc_comment)]
     order: Option<String>,
 
+    /// Preserve the original order for unspecified derive attributes (only applies when --order is used)
+    #[clap(long)]
+    preserve: bool,
+
     /// Check if the derive attributes are sorted
     #[clap(long)]
     check: bool,
@@ -41,11 +45,12 @@ fn main() {
     let config = Config::load();
 
     let custom_order = read_custom_order(&config, &args);
+    let preserve = args.preserve;
     let check = args.check;
 
     let mut no_diff = true;
     for (file_path, line_numbers) in grep().unwrap() {
-        no_diff &= process_file(&file_path, line_numbers, &custom_order, check).unwrap();
+        no_diff &= process_file(&file_path, line_numbers, &custom_order, preserve, check).unwrap();
     }
 
     if !no_diff {
