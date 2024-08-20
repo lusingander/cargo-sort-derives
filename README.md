@@ -22,10 +22,11 @@ $ cargo install --locked cargo-sort-derives
 Usage: cargo sort-derives [OPTIONS]
 
 Options:
-  -o, --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
+      --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
                        Any derives not listed will appear at the end in alphabetical order by default
       --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)
       --check          Check if the derive attributes are sorted
+      --color <TYPE>   Use colored output [default: auto] [possible values: auto, always, never]
   -h, --help           Print help
   -V, --version        Print version
 ```
