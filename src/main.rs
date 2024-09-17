@@ -65,17 +65,22 @@ fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
     args.preserve || config.preserve.unwrap_or(false)
 }
 
+fn read_exclude(config: &Config) -> Vec<String> {
+    config.exclude.clone().unwrap_or_default()
+}
+
 fn main() {
     let Cli::SortDerives(args) = Cli::parse();
     let config = Config::load();
 
     let custom_order = read_custom_order(&config, &args);
     let preserve = read_preserve(&config, &args);
+    let exclude = read_exclude(&config);
     let check = args.check;
     let output_color = args.color.into();
 
     let mut no_diff = true;
-    for (file_path, line_numbers) in grep().unwrap() {
+    for (file_path, line_numbers) in grep(exclude).unwrap() {
         no_diff &= process_file(
             &file_path,
             line_numbers,

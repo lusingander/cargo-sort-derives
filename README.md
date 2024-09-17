@@ -124,6 +124,14 @@ order = "Eq, Clone, Default"
 # The command line option `--preserve` will override this setting if specified.
 # type: boolean
 preserve = true
+
+# Specify file path patterns to exclude from processing using the .gitignore format.
+# https://git-scm.com/docs/gitignore/en#_pattern_format
+# type: array of strings
+exclude = [
+  "generated.rs",
+  "/tests/*",
+]
 ```
 
 ## License

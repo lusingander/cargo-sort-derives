@@ -6,7 +6,7 @@ use std::{
 
 use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
-use ignore::{types::TypesBuilder, WalkBuilder};
+use ignore::{overrides::OverrideBuilder, types::TypesBuilder, WalkBuilder};
 
 const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
@@ -17,18 +17,23 @@ struct Match {
     line_number: usize,
 }
 
-pub fn grep() -> Result<Matches, String> {
+pub fn grep(exclude: Vec<String>) -> Result<Matches, String> {
     let (tx, rx) = mpsc::channel();
+
+    let mut type_builder = TypesBuilder::new();
+    type_builder.add_defaults().select("rust");
+
+    let mut override_builder = OverrideBuilder::new(".");
+    for glob in exclude {
+        override_builder
+            .add(&format!("!{}", glob))
+            .map_err(|e| e.to_string())?;
+    }
 
     let walker = WalkBuilder::new(".")
         .standard_filters(true)
-        .types(
-            TypesBuilder::new()
-                .add_defaults()
-                .select("rust")
-                .build()
-                .unwrap(),
-        )
+        .types(type_builder.build().unwrap())
+        .overrides(override_builder.build().unwrap())
         .build_parallel();
 
     walker.run(|| {

@@ -6,6 +6,7 @@ const CONFIG_FILE_NAME: &str = ".sort-derives.toml";
 pub struct Config {
     pub order: Option<String>,
     pub preserve: Option<bool>,
+    pub exclude: Option<Vec<String>>,
 }
 
 impl Config {
