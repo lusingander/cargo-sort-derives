@@ -10,6 +10,7 @@ readme = "README.md"
 license = "MIT"
 keywords = ["cargo", "subcommand", "plugin", "derive"]
 categories = ["development-tools::cargo-plugins", "command-line-utilities"]
+rust-version = "1.80.0"
 
 exclude = ["/.github", "/img", "_config.yml"]
 
