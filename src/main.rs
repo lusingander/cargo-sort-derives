@@ -80,7 +80,7 @@ fn main() {
     let output_color = args.color.into();
 
     let mut no_diff = true;
-    for (file_path, line_numbers) in grep(exclude).unwrap() {
+    for (file_path, line_numbers) in grep(".", exclude).unwrap() {
         no_diff &= process_file(
             &file_path,
             line_numbers,

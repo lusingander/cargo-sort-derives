@@ -17,20 +17,20 @@ struct Match {
     line_number: usize,
 }
 
-pub fn grep(exclude: Vec<String>) -> Result<Matches, String> {
+pub fn grep<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Matches, String> {
     let (tx, rx) = mpsc::channel();
 
     let mut type_builder = TypesBuilder::new();
     type_builder.add_defaults().select("rust");
 
-    let mut override_builder = OverrideBuilder::new(".");
+    let mut override_builder = OverrideBuilder::new(root.as_ref());
     for glob in exclude {
         override_builder
             .add(&format!("!{}", glob))
             .map_err(|e| e.to_string())?;
     }
 
-    let walker = WalkBuilder::new(".")
+    let walker = WalkBuilder::new(root.as_ref())
         .standard_filters(true)
         .types(type_builder.build().unwrap())
         .overrides(override_builder.build().unwrap())
