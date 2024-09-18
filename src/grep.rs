@@ -154,6 +154,29 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    #[test]
+    fn test_with_ignore_file() {
+        let files = &[
+            ("a.rs", rs_file_1(), true),
+            ("b.rs", rs_file_1(), false),
+            ("x/xa.rs", rs_file_1(), true),
+            ("x/xb.rs", rs_file_1(), true),
+            ("x/y/ya.rs", rs_file_1(), false),
+            ("x/z/za.rs", rs_file_1(), true),
+        ];
+        let exclude = vec![];
+
+        let tmp_root_dir = setup_tmp_files(files);
+
+        setup_ignore_file(&tmp_root_dir, ".ignore", vec!["b.rs", "x/y/*"]);
+
+        let expected = expected_matches(tmp_root_dir.path(), files);
+
+        let actual = grep(tmp_root_dir.path(), exclude).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
     fn rs_file_1() -> (&'static str, HashSet<usize>) {
         let source = r#"
         #[derive(Debug)]
@@ -190,5 +213,12 @@ mod tests {
             .filter(|(_, (_, _), is_match)| *is_match)
             .map(|(p, (_, ls), _)| (tmp_root_path.join(p), ls.iter().copied().collect()))
             .collect()
+    }
+
+    fn setup_ignore_file(tmp_root_dir: &assert_fs::TempDir, ignore_file: &str, exclude: Vec<&str>) {
+        tmp_root_dir
+            .child(ignore_file)
+            .write_str(&exclude.join("\n"))
+            .unwrap();
     }
 }
