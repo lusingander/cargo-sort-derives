@@ -107,6 +107,12 @@ This checks if the `derive` attributes in your `.rs` files are sorted correctly.
 
 If the attributes are out of order, the command will exit with a non-zero status code, indicating that the files need to be updated.
 
+### Exclude targets
+
+If the `.gitignore` or `.ignore` file exists, the files listed there will be excluded.
+
+You can specify files to exclude in the `exclude` section of the [config file](#config).
+
 ### Config
 
 If `.sort-derives.toml` exists in the current directory, the config will be loaded.
