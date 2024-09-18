@@ -25,3 +25,6 @@ regex = "1.10.6"
 serde = { version = "1.0.208", features = ["derive"] }
 similar = "2.6.0"
 toml = "0.8.19"
+
+[dev-dependencies]
+assert_fs = "1.1.2"
