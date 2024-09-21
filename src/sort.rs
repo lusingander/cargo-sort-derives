@@ -95,19 +95,26 @@ fn sort_derive_traits(
     custom_order: &Option<Vec<&str>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
-    let mut sort_derives = derives.to_vec();
-    if !preserve {
-        // sort by alphabetical order
-        sort_derives.sort_by(|a, b| a.base_name.cmp(&b.base_name));
-    }
+    let order_map: HashMap<&str, usize> = custom_order
+        .as_ref()
+        .map_or(HashMap::new(), |order| {
+            order.iter().enumerate().map(|(i, &s)| (s, i)).collect()
+        });
 
-    if let Some(order) = custom_order {
-        let order_map: HashMap<&str, usize> =
-            order.iter().enumerate().map(|(i, &s)| (s, i)).collect();
-        sort_derives.sort_by_key(|d| order_map.get(d.base_name.as_str()).unwrap_or(&usize::MAX));
-    }
+    let mut sorted_derives = derives.to_vec();
+    sorted_derives.sort_by(|a, b| {
+        const IGNORE: &usize = &usize::MAX;
+        let priority_a = order_map.get(a.base_name.as_str()).unwrap_or(IGNORE);
+        let priority_b = order_map.get(b.base_name.as_str()).unwrap_or(IGNORE);
 
-    sort_derives
+        if preserve && priority_a == IGNORE && priority_b == IGNORE {
+            std::cmp::Ordering::Equal
+        } else {
+            (priority_a, &a.base_name, &a.s).cmp(&(priority_b, &b.base_name, &b.s))
+        }
+    });
+
+    sorted_derives
 }
 
 fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
@@ -208,7 +215,12 @@ mod tests {
     fn test_sort_derive_traits_without_order() {
         let derives = vec![
             dt("Debug", "Debug"),
+            dt("b::Eq", "Eq"),
+            dt("a::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
+            dt("Eq", "Eq"),
+            dt("b::Foo", "Foo"),
+            dt("a::Foo", "Foo"),
             dt("Foo", "Foo"),
             dt("std::clone::Clone", "Clone"),
             dt("Hash", "Hash"),
@@ -221,8 +233,13 @@ mod tests {
             dt("foo::bar::Bar", "Bar"),
             dt("std::clone::Clone", "Clone"),
             dt("Debug", "Debug"),
+            dt("Eq", "Eq"),
+            dt("a::Eq", "Eq"),
+            dt("b::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
             dt("Foo", "Foo"),
+            dt("a::Foo", "Foo"),
+            dt("b::Foo", "Foo"),
             dt("Hash", "Hash"),
             dt("cmp::PartialOrd", "PartialOrd"),
         ];
@@ -233,7 +250,12 @@ mod tests {
     fn test_sort_derive_traits_with_order() {
         let derives = vec![
             dt("Debug", "Debug"),
+            dt("b::Eq", "Eq"),
+            dt("a::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
+            dt("Eq", "Eq"),
+            dt("b::Foo", "Foo"),
+            dt("a::Foo", "Foo"),
             dt("Foo", "Foo"),
             dt("std::clone::Clone", "Clone"),
             dt("Hash", "Hash"),
@@ -255,11 +277,16 @@ mod tests {
         let expected = vec![
             dt("Debug", "Debug"),
             dt("std::clone::Clone", "Clone"),
+            dt("Eq", "Eq"),
+            dt("a::Eq", "Eq"),
+            dt("b::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
             dt("cmp::PartialOrd", "PartialOrd"),
             dt("Hash", "Hash"),
             dt("foo::bar::Bar", "Bar"),
             dt("Foo", "Foo"),
+            dt("a::Foo", "Foo"),
+            dt("b::Foo", "Foo"),
         ];
         assert_eq!(actual, expected);
     }
@@ -268,7 +295,12 @@ mod tests {
     fn test_sort_derive_traits_with_order_and_preserve() {
         let derives = vec![
             dt("Debug", "Debug"),
+            dt("b::Eq", "Eq"),
+            dt("a::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
+            dt("Eq", "Eq"),
+            dt("b::Foo", "Foo"),
+            dt("a::Foo", "Foo"),
             dt("Foo", "Foo"),
             dt("std::clone::Clone", "Clone"),
             dt("Hash", "Hash"),
@@ -290,9 +322,14 @@ mod tests {
         let expected = vec![
             dt("Debug", "Debug"),
             dt("std::clone::Clone", "Clone"),
+            dt("Eq", "Eq"),
+            dt("a::Eq", "Eq"),
+            dt("b::Eq", "Eq"),
             dt("cmp::Eq", "Eq"),
             dt("cmp::PartialOrd", "PartialOrd"),
             dt("Hash", "Hash"),
+            dt("b::Foo", "Foo"),
+            dt("a::Foo", "Foo"),
             dt("Foo", "Foo"),
             dt("foo::bar::Bar", "Bar"),
         ];
