@@ -95,17 +95,17 @@ fn sort_derive_traits(
     custom_order: &Option<Vec<&str>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
-    let order_map: HashMap<&str, usize> = custom_order
+    let order_map: HashMap<String, usize> = custom_order
         .as_ref()
         .map_or(HashMap::new(), |order| {
-            order.iter().enumerate().map(|(i, &s)| (s, i)).collect()
+            order.iter().enumerate().map(|(i, &s)| (s.to_string(), i)).collect()
         });
 
     let mut sorted_derives = derives.to_vec();
     sorted_derives.sort_by(|a, b| {
         const IGNORE: &usize = &usize::MAX;
-        let priority_a = order_map.get(a.base_name.as_str()).unwrap_or(IGNORE);
-        let priority_b = order_map.get(b.base_name.as_str()).unwrap_or(IGNORE);
+        let priority_a = order_map.get(&a.base_name).unwrap_or(IGNORE);
+        let priority_b = order_map.get(&b.base_name).unwrap_or(IGNORE);
 
         if preserve && priority_a == IGNORE && priority_b == IGNORE {
             std::cmp::Ordering::Equal
