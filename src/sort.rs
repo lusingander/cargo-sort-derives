@@ -97,7 +97,7 @@ fn sort_derive_traits(
 ) -> Vec<DeriveTrait> {
     let order_map: HashMap<String, usize> = custom_order
         .as_ref()
-        .map_or(HashMap::new(), |order| {
+        .map_or_else(HashMap::new, |order| {
             order.iter().enumerate().map(|(i, &s)| (s.to_string(), i)).collect()
         });
 
@@ -110,12 +110,15 @@ fn sort_derive_traits(
         if preserve && priority_a == IGNORE && priority_b == IGNORE {
             std::cmp::Ordering::Equal
         } else {
-            (priority_a, &a.base_name, &a.s).cmp(&(priority_b, &b.base_name, &b.s))
+            priority_a.cmp(priority_b)
+                .then_with(|| a.base_name.cmp(&b.base_name))
+                .then_with(|| a.s.cmp(&b.s))
         }
     });
 
     sorted_derives
 }
+
 
 fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
     let sorted_derive_str = sorted_derives
