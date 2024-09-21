@@ -95,10 +95,13 @@ fn sort_derive_traits(
     custom_order: &Option<Vec<&str>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
-    let order_map: HashMap<String, usize> = custom_order
-        .as_ref()
-        .map_or_else(HashMap::new, |order| {
-            order.iter().enumerate().map(|(i, &s)| (s.to_string(), i)).collect()
+    let order_map: HashMap<String, usize> =
+        custom_order.as_ref().map_or_else(HashMap::new, |order| {
+            order
+                .iter()
+                .enumerate()
+                .map(|(i, &s)| (s.to_string(), i))
+                .collect()
         });
 
     let mut sorted_derives = derives.to_vec();
@@ -110,7 +113,8 @@ fn sort_derive_traits(
         if preserve && priority_a == IGNORE && priority_b == IGNORE {
             std::cmp::Ordering::Equal
         } else {
-            priority_a.cmp(priority_b)
+            priority_a
+                .cmp(priority_b)
                 .then_with(|| a.base_name.cmp(&b.base_name))
                 .then_with(|| a.s.cmp(&b.s))
         }
@@ -118,7 +122,6 @@ fn sort_derive_traits(
 
     sorted_derives
 }
-
 
 fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
     let sorted_derive_str = sorted_derives
