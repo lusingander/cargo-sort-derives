@@ -1,12 +1,14 @@
 mod config;
 mod ext;
 mod grep;
+mod process;
 mod sort;
 
 use clap::{Args, Parser, ValueEnum};
 use config::Config;
 use grep::grep;
-use sort::process_file;
+use process::process;
+use sort::sort;
 
 #[derive(Debug, Parser)]
 #[command(name = "cargo", bin_name = "cargo")]
@@ -42,12 +44,12 @@ enum Color {
     Never,
 }
 
-impl From<Color> for sort::OutputColor {
+impl From<Color> for process::OutputColor {
     fn from(color: Color) -> Self {
         match color {
-            Color::Auto => sort::OutputColor::Auto,
-            Color::Always => sort::OutputColor::Always,
-            Color::Never => sort::OutputColor::Never,
+            Color::Auto => process::OutputColor::Auto,
+            Color::Always => process::OutputColor::Always,
+            Color::Never => process::OutputColor::Never,
         }
     }
 }
@@ -81,15 +83,9 @@ fn main() {
 
     let mut no_diff = true;
     for (file_path, line_numbers) in grep(".", exclude).unwrap() {
-        no_diff &= process_file(
-            &file_path,
-            line_numbers,
-            &custom_order,
-            preserve,
-            check,
-            output_color,
-        )
-        .unwrap();
+        let (old_lines, new_lines) =
+            sort(&file_path, line_numbers, &custom_order, preserve).unwrap();
+        no_diff &= process(&file_path, old_lines, new_lines, check, output_color).unwrap();
     }
 
     if !no_diff {
