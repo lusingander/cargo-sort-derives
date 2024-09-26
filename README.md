@@ -95,6 +95,8 @@ struct Example;
 struct Example;
 ```
 
+You can also specify the order in the `order` section of the [config file](#config).
+
 ### Check without updates
 
 <img src="./img/check.gif" width=600>
