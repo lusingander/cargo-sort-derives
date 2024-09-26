@@ -122,10 +122,17 @@ If `.sort-derives.toml` exists in the current directory, the config will be load
 The `.sort-derives.toml` file uses the following format:
 
 ```toml
-# Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
+# Define the custom order of derive attributes.
 # The command line option `--order` will override this setting if specified.
-# type: string
-order = "Eq, Clone, Default"
+# type: array of strings | string
+order = [
+  "Eq",
+  "Clone",
+  "Default",
+]
+# Alternatively, it can be set as a comma separated string, similar to the `--order`.
+# order = "Eq, Clone, Default"
+
 # Preserve the original order for unspecified derive attributes (only applies when custom order is used)
 # The command line option `--preserve` will override this setting if specified.
 # type: boolean

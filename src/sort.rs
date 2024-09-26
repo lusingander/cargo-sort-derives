@@ -14,7 +14,7 @@ static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
 pub fn sort(
     file_path: &Path,
     line_numbers: HashSet<usize>,
-    custom_order: &Option<Vec<&str>>,
+    custom_order: &Option<Vec<String>>,
     preserve: bool,
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
     let file = std::fs::File::open(file_path)?;
@@ -67,7 +67,7 @@ fn parse_derive_traits(line: &str) -> Vec<DeriveTrait> {
 
 fn sort_derive_traits(
     derives: &[DeriveTrait],
-    custom_order: &Option<Vec<&str>>,
+    custom_order: &Option<Vec<String>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
     let order_map: HashMap<String, usize> =
@@ -75,7 +75,7 @@ fn sort_derive_traits(
             order
                 .iter()
                 .enumerate()
-                .map(|(i, &s)| (s.to_string(), i))
+                .map(|(i, s)| (s.clone(), i))
                 .collect()
         });
 
@@ -179,17 +179,22 @@ mod tests {
             dt("cmp::PartialOrd", "PartialOrd"),
             dt("foo::bar::Bar", "Bar"),
         ];
-        let order = Some(vec![
-            "Debug",
-            "Default",
-            "Clone",
-            "Copy",
-            "PartialEq",
-            "Eq",
-            "PartialOrd",
-            "Ord",
-            "Hash",
-        ]);
+        let order = Some(
+            vec![
+                "Debug",
+                "Default",
+                "Clone",
+                "Copy",
+                "PartialEq",
+                "Eq",
+                "PartialOrd",
+                "Ord",
+                "Hash",
+            ]
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+        );
         let actual = sort_derive_traits(&derives, &order, false);
         let expected = vec![
             dt("Debug", "Debug"),
@@ -224,17 +229,22 @@ mod tests {
             dt("cmp::PartialOrd", "PartialOrd"),
             dt("foo::bar::Bar", "Bar"),
         ];
-        let order = Some(vec![
-            "Debug",
-            "Default",
-            "Clone",
-            "Copy",
-            "PartialEq",
-            "Eq",
-            "PartialOrd",
-            "Ord",
-            "Hash",
-        ]);
+        let order = Some(
+            vec![
+                "Debug",
+                "Default",
+                "Clone",
+                "Copy",
+                "PartialEq",
+                "Eq",
+                "PartialOrd",
+                "Ord",
+                "Hash",
+            ]
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+        );
         let actual = sort_derive_traits(&derives, &order, true);
         let expected = vec![
             dt("Debug", "Debug"),
