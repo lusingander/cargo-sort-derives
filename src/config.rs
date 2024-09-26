@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 const CONFIG_FILE_NAME: &str = ".sort-derives.toml";
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
     pub order: Option<Vec<String>>,
     pub preserve: Option<bool>,
@@ -61,5 +61,61 @@ impl Config {
         } else {
             Config::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_deserialize_empty() {
+        let toml = "";
+        let expected = Config::default();
+
+        let actual = deserialize_config(toml);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_config_deserialize_order_is_string() {
+        let toml = r#"
+            order = "A, B, C"
+            preserve = true
+            exclude = ["D", "E"]
+        "#;
+        let expected = config(&["A", "B", "C"], true, &["D", "E"]);
+
+        let actual = deserialize_config(toml);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_config_deserialize_order_is_array() {
+        let toml = r#"
+            order = ["A", "B", "C"]
+            preserve = true
+            exclude = ["D", "E"]
+        "#;
+        let expected = config(&["A", "B", "C"], true, &["D", "E"]);
+
+        let actual = deserialize_config(toml);
+
+        assert_eq!(actual, expected);
+    }
+
+    fn config(order: &[&str], preserve: bool, exclude: &[&str]) -> Config {
+        Config {
+            order: Some(order.iter().map(|s| s.to_string()).collect()),
+            preserve: Some(preserve),
+            exclude: Some(exclude.iter().map(|s| s.to_string()).collect()),
+        }
+    }
+
+    fn deserialize_config(toml: &str) -> Config {
+        let interal_config: InternalConfig = toml::from_str(toml).unwrap();
+        interal_config.into()
     }
 }
