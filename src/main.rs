@@ -54,13 +54,16 @@ impl From<Color> for process::OutputColor {
     }
 }
 
-fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<&'a str>> {
-    let order_str = args.order.as_deref().or(config.order.as_deref());
-    order_str.map(parse_order)
+fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<String>> {
+    args.order.clone().map(parse_order).or(config.order.clone())
 }
 
-fn parse_order(order: &str) -> Vec<&str> {
-    order.split(',').map(str::trim).collect()
+fn parse_order(order: String) -> Vec<String> {
+    order
+        .split(',')
+        .map(str::trim)
+        .map(str::to_string)
+        .collect()
 }
 
 fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
