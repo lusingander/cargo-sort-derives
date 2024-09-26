@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::util::parse_order;
+
 const CONFIG_FILE_NAME: &str = ".sort-derives.toml";
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -40,14 +42,6 @@ impl OrderType {
             OrderType::Array(ss) => ss,
         }
     }
-}
-
-fn parse_order(order: String) -> Vec<String> {
-    order
-        .split(',')
-        .map(str::trim)
-        .map(str::to_string)
-        .collect()
 }
 
 impl Config {

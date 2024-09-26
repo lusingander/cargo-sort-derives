@@ -3,12 +3,11 @@ mod ext;
 mod grep;
 mod process;
 mod sort;
+mod util;
 
 use clap::{Args, Parser, ValueEnum};
-use config::Config;
-use grep::grep;
-use process::process;
-use sort::sort;
+
+use crate::{config::Config, grep::grep, process::process, sort::sort, util::parse_order};
 
 #[derive(Debug, Parser)]
 #[command(name = "cargo", bin_name = "cargo")]
@@ -56,14 +55,6 @@ impl From<Color> for process::OutputColor {
 
 fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<String>> {
     args.order.clone().map(parse_order).or(config.order.clone())
-}
-
-fn parse_order(order: String) -> Vec<String> {
-    order
-        .split(',')
-        .map(str::trim)
-        .map(str::to_string)
-        .collect()
 }
 
 fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
