@@ -22,6 +22,8 @@ $ cargo install --locked cargo-sort-derives
 Usage: cargo sort-derives [OPTIONS]
 
 Options:
+  -p, --path <FILE>    The path to the file to sort
+                       If not specified, all `.rs` files in the current directory will be sorted
       --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
                        Any derives not listed will appear at the end in alphabetical order by default
       --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)
@@ -108,6 +110,16 @@ $ cargo sort-derives --check
 This checks if the `derive` attributes in your `.rs` files are sorted correctly.
 
 If the attributes are out of order, the command will exit with a non-zero status code, indicating that the files need to be updated.
+
+### Process only specific files
+
+```
+$ cargo sort-derives --path ./path/to/file.rs
+```
+
+You can sort only the files specified by the `--path` option.
+
+You cannot specify a directory or multiple paths. Also, all [exclusions](#exclude-targets) are ignored.
 
 ### Exclude targets
 

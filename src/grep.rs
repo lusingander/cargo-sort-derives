@@ -6,7 +6,7 @@ use std::{
 
 use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
-use ignore::{overrides::OverrideBuilder, types::TypesBuilder, WalkBuilder};
+use ignore::{overrides::OverrideBuilder, types::TypesBuilder, WalkBuilder, WalkParallel};
 
 const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
@@ -17,9 +17,14 @@ struct Match {
     line_number: usize,
 }
 
-pub fn grep<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Matches, String> {
-    let (tx, rx) = mpsc::channel();
+pub fn grep<P: AsRef<Path>>(path: Option<P>, exclude: Vec<String>) -> Result<Matches, String> {
+    match path {
+        Some(path) => grep_single_file(path),
+        None => grep_all_files(".", exclude),
+    }
+}
 
+fn grep_all_files<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Matches, String> {
     let mut type_builder = TypesBuilder::new();
     type_builder.add_defaults().select("rust");
 
@@ -35,6 +40,28 @@ pub fn grep<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Matches, St
         .types(type_builder.build().unwrap())
         .overrides(override_builder.build().unwrap())
         .build_parallel();
+
+    exec_grep(walker)
+}
+
+fn grep_single_file<P: AsRef<Path>>(path: P) -> Result<Matches, String> {
+    let path = path.as_ref();
+
+    if path.is_dir() {
+        return Err(format!("{} is a directory", path.display()));
+    }
+
+    if path.extension().map_or(true, |ext| ext != "rs") {
+        return Err(format!("{} is not a Rust source file", path.display()));
+    }
+
+    let walker = WalkBuilder::new(path).build_parallel();
+
+    exec_grep(walker)
+}
+
+fn exec_grep(walker: WalkParallel) -> Result<Matches, String> {
+    let (tx, rx) = mpsc::channel();
 
     walker.run(|| {
         let tx = tx.clone();
@@ -105,7 +132,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_grep() {
+    fn test_grep_all_files() {
         let files = &[
             ("a.rs", rs_file_1(), true),
             ("b.rs", rs_file_1(), true),
@@ -120,13 +147,13 @@ mod tests {
         let tmp_root_dir = setup_tmp_files(files);
         let expected = expected_matches(tmp_root_dir.path(), files);
 
-        let actual = grep(tmp_root_dir.path(), exclude).unwrap();
+        let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
 
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn test_grep_with_exclude() {
+    fn test_grep_all_files_with_exclude() {
         let files = &[
             ("a.rs", rs_file_1(), true),
             ("b.rs", rs_file_1(), false),
@@ -149,13 +176,13 @@ mod tests {
         let tmp_root_dir = setup_tmp_files(files);
         let expected = expected_matches(tmp_root_dir.path(), files);
 
-        let actual = grep(tmp_root_dir.path(), exclude).unwrap();
+        let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
 
         assert_eq!(actual, expected);
     }
 
     #[test]
-    fn test_with_ignore_file() {
+    fn test_grep_all_files_with_ignore_file() {
         let files = &[
             ("a.rs", rs_file_1(), true),
             ("b.rs", rs_file_1(), false),
@@ -172,9 +199,83 @@ mod tests {
 
         let expected = expected_matches(tmp_root_dir.path(), files);
 
-        let actual = grep(tmp_root_dir.path(), exclude).unwrap();
+        let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_grep_single_file() {
+        let files = &[
+            ("a.rs", rs_file_1(), false),
+            ("b.rs", rs_file_1(), false),
+            ("x/xa.rs", rs_file_1(), true),
+            ("x/xb.rs", rs_file_1(), false),
+            ("x/y/ya.rs", rs_file_1(), false),
+            ("x/z/za.rs", rs_file_1(), false),
+        ];
+
+        let tmp_root_dir = setup_tmp_files(files);
+
+        let expected = expected_matches(tmp_root_dir.path(), files);
+
+        let actual = grep_single_file(tmp_root_dir.child("x/xa.rs")).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_grep_single_file_with_ignore_file() {
+        let files = &[
+            ("a.rs", rs_file_1(), false),
+            ("b.rs", rs_file_1(), false),
+            ("x/xa.rs", rs_file_1(), true),
+            ("x/xb.rs", rs_file_1(), false),
+            ("x/y/ya.rs", rs_file_1(), false),
+            ("x/z/za.rs", rs_file_1(), false),
+        ];
+
+        let tmp_root_dir = setup_tmp_files(files);
+
+        setup_ignore_file(&tmp_root_dir, ".ignore", vec!["x/xa.rs"]);
+
+        let expected = expected_matches(tmp_root_dir.path(), files);
+
+        let actual = grep_single_file(tmp_root_dir.child("x/xa.rs")).unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_grep_single_file_path_is_dir() {
+        let files = &[
+            ("a.rs", rs_file_1(), false),
+            ("b.rs", rs_file_1(), false),
+            ("x/xa.rs", rs_file_1(), true),
+            ("x/xb.rs", rs_file_1(), false),
+        ];
+
+        let tmp_root_dir = setup_tmp_files(files);
+
+        let actual = grep_single_file(tmp_root_dir.child("x/"));
+
+        assert!(actual.is_err());
+    }
+
+    #[test]
+    fn test_grep_single_file_path_is_not_rs() {
+        let files = &[
+            ("a.rs", rs_file_1(), false),
+            ("b.rs", rs_file_1(), false),
+            ("x/xa.txt", rs_file_1(), true),
+            ("x/xb.rs", rs_file_1(), false),
+        ];
+
+        let tmp_root_dir = setup_tmp_files(files);
+
+        let actual = grep_single_file(tmp_root_dir.child("x/xa.txt"));
+
+        assert!(actual.is_err());
     }
 
     fn rs_file_1() -> (&'static str, HashSet<usize>) {
