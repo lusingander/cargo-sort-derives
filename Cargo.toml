@@ -15,13 +15,13 @@ rust-version = "1.80.0"
 exclude = ["/.github", "/img", "_config.yml"]
 
 [dependencies]
-clap = { version = "4.5.18", features = ["derive"] }
+clap = { version = "4.5.19", features = ["derive"] }
 console = "0.15.8"
 grep-matcher = "0.1.7"
 grep-regex = "0.1.13"
 grep-searcher = "0.1.14"
 ignore = "0.4.23"
-regex = "1.10.6"
+regex = "1.11.0"
 serde = { version = "1.0.210", features = ["derive"] }
 similar = "2.6.0"
 toml = "0.8.19"
