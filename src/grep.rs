@@ -10,7 +10,7 @@ use ignore::{overrides::OverrideBuilder, types::TypesBuilder, WalkBuilder, WalkP
 
 const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
-pub type Matches = HashMap<PathBuf, HashSet<usize>>;
+pub type Matches = Vec<(PathBuf, HashSet<usize>)>;
 
 struct Match {
     file_path: PathBuf,
@@ -85,13 +85,19 @@ fn exec_grep(walker: WalkParallel) -> Result<Matches, String> {
 
     let matches: Result<Vec<Match>, String> = rx.into_iter().collect();
 
-    matches.map(|ms| {
-        ms.into_iter()
-            .fold(HashMap::<PathBuf, HashSet<usize>>::new(), |mut acc, m| {
-                acc.entry(m.file_path).or_default().insert(m.line_number);
-                acc
-            })
-    })
+    matches
+        .map(|ms| {
+            ms.into_iter()
+                .fold(HashMap::<PathBuf, HashSet<usize>>::new(), |mut acc, m| {
+                    acc.entry(m.file_path).or_default().insert(m.line_number);
+                    acc
+                })
+        })
+        .map(|m| {
+            let mut vec: Vec<(PathBuf, HashSet<usize>)> = m.into_iter().collect();
+            vec.sort_by(|(a, _), (b, _)| a.cmp(b));
+            vec
+        })
 }
 
 struct SearchSink<'a> {
