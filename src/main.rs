@@ -70,7 +70,7 @@ fn read_exclude(config: &Config) -> Vec<String> {
     config.exclude.clone().unwrap_or_default()
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli::SortDerives(args) = Cli::parse();
     let config = Config::load();
 
@@ -82,13 +82,14 @@ fn main() {
     let output_color = args.color.into();
 
     let mut no_diff = true;
-    for (file_path, line_numbers) in grep(path, exclude).unwrap() {
-        let (old_lines, new_lines) =
-            sort(&file_path, line_numbers, &custom_order, preserve).unwrap();
-        no_diff &= process(&file_path, old_lines, new_lines, check, output_color).unwrap();
+    for (file_path, line_numbers) in grep(path, exclude)? {
+        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
+        no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
     }
 
     if !no_diff {
         std::process::exit(1);
     }
+
+    Ok(())
 }
