@@ -129,11 +129,11 @@ You can specify files to exclude in the `exclude` section of the [config file](#
 
 ### Config
 
-If `.sort-derives.toml` exists in the current directory, the config will be loaded.
+If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, the config will be loaded.
 
 #### Format
 
-The `.sort-derives.toml` file uses the following format:
+The config file uses the following format:
 
 ```toml
 # Define the custom order of derive attributes.

@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 use crate::util::parse_order;
 
-const CONFIG_FILE_NAME: &str = ".sort-derives.toml";
+const CONFIG_FILE_NAMES: &[&str] = &[".sort-derives.toml", "sort-derives.toml"];
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Config {
@@ -46,16 +48,24 @@ impl OrderType {
 
 impl Config {
     pub fn load() -> Config {
-        let config_file_path = std::env::current_dir().unwrap().join(CONFIG_FILE_NAME);
-
-        if config_file_path.exists() {
-            let config_file = std::fs::read_to_string(&config_file_path).unwrap();
-            let interal_config: InternalConfig = toml::from_str(&config_file).unwrap();
-            interal_config.into()
-        } else {
-            Config::default()
-        }
+        load_from(std::env::current_dir().unwrap())
     }
+}
+
+fn load_from(path: PathBuf) -> Config {
+    let config_file_paths = CONFIG_FILE_NAMES.iter().map(|p| path.join(p)).collect();
+
+    if let Some(config_file_path) = first_exist_path(config_file_paths) {
+        let config_file = std::fs::read_to_string(config_file_path).unwrap();
+        let interal_config: InternalConfig = toml::from_str(&config_file).unwrap();
+        interal_config.into()
+    } else {
+        Config::default()
+    }
+}
+
+fn first_exist_path(paths: Vec<PathBuf>) -> Option<PathBuf> {
+    paths.into_iter().find(|p| p.exists())
 }
 
 #[cfg(test)]
