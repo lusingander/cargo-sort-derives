@@ -23,7 +23,7 @@ Usage: cargo sort-derives [OPTIONS]
 
 Options:
   -p, --path <FILE>    The path to the file to sort
-                       If not specified, all `.rs` files in the current directory will be sorted
+                       If not specified, all .rs files in the current directory will be sorted
       --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
                        Any derives not listed will appear at the end in alphabetical order by default
       --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)

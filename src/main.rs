@@ -19,7 +19,7 @@ enum Cli {
 #[command(version, about, long_about = None)]
 struct SortDerivesArgs {
     /// The path to the file to sort
-    /// If not specified, all `.rs` files in the current directory will be sorted
+    /// If not specified, all .rs files in the current directory will be sorted
     #[clap(short, long, value_name = "FILE", verbatim_doc_comment)]
     path: Option<String>,
 
