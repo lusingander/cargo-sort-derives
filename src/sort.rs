@@ -70,18 +70,28 @@ fn sort_derive_traits(
     custom_order: &Option<Vec<String>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
-    let order_map: HashMap<String, usize> =
-        custom_order.as_ref().map_or_else(HashMap::new, |order| {
-            order
+    const IGNORE: &usize = &10_000; // large enough
+
+    let order_map: HashMap<String, usize> = match custom_order {
+        Some(custom_order) => {
+            let head_order = custom_order
                 .iter()
+                .take_while(|s| *s != "...")
                 .enumerate()
-                .map(|(i, s)| (s.clone(), i))
-                .collect()
-        });
+                .map(|(i, s)| (s.clone(), i));
+            let tail_order = custom_order
+                .iter()
+                .skip_while(|s| *s != "...")
+                .skip(1)
+                .enumerate()
+                .map(|(i, s)| (s.clone(), i + IGNORE + 1));
+            head_order.chain(tail_order).collect()
+        }
+        None => HashMap::new(),
+    };
 
     let mut sorted_derives = derives.to_vec();
     sorted_derives.sort_by(|a, b| {
-        const IGNORE: &usize = &usize::MAX;
         let priority_a = order_map.get(&a.base_name).unwrap_or(IGNORE);
         let priority_b = order_map.get(&b.base_name).unwrap_or(IGNORE);
 
@@ -259,6 +269,126 @@ mod tests {
             dt("a::Foo", "Foo"),
             dt("Foo", "Foo"),
             dt("foo::bar::Bar", "Bar"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_derive_traits_with_head_ellipsis_order() {
+        let derives = vec![
+            dt("D", "D"),
+            dt("B", "B"),
+            dt("A", "A"),
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("C", "C"),
+            dt("G", "G"),
+        ];
+        let order = Some(vec!["...", "D", "A"].into_iter().map(Into::into).collect());
+        let actual = sort_derive_traits(&derives, &order, false);
+        let expected = vec![
+            // ellipsis
+            dt("B", "B"),
+            dt("C", "C"),
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("G", "G"),
+            // tail
+            dt("D", "D"),
+            dt("A", "A"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_derive_traits_with_middle_ellipsis_order() {
+        let derives = vec![
+            dt("D", "D"),
+            dt("B", "B"),
+            dt("A", "A"),
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("C", "C"),
+            dt("G", "G"),
+        ];
+        let order = Some(
+            vec!["B", "G", "...", "D", "A"]
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        );
+        let actual = sort_derive_traits(&derives, &order, false);
+        let expected = vec![
+            // head
+            dt("B", "B"),
+            dt("G", "G"),
+            // ellipsis
+            dt("C", "C"),
+            dt("E", "E"),
+            dt("F", "F"),
+            // tail
+            dt("D", "D"),
+            dt("A", "A"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_derive_traits_with_tail_ellipsis_order() {
+        let derives = vec![
+            dt("D", "D"),
+            dt("B", "B"),
+            dt("A", "A"),
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("C", "C"),
+            dt("G", "G"),
+        ];
+        let order = Some(vec!["B", "G", "..."].into_iter().map(Into::into).collect());
+        let actual = sort_derive_traits(&derives, &order, false);
+        let expected = vec![
+            // head
+            dt("B", "B"),
+            dt("G", "G"),
+            // ellipsis
+            dt("A", "A"),
+            dt("C", "C"),
+            dt("D", "D"),
+            dt("E", "E"),
+            dt("F", "F"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_derive_traits_with_middle_ellipsis_order_and_preserve() {
+        let derives = vec![
+            dt("D", "D"),
+            dt("B", "B"),
+            dt("A", "A"),
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("C", "C"),
+            dt("G", "G"),
+        ];
+        let order = Some(
+            vec!["B", "G", "...", "D", "A"]
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        );
+        let actual = sort_derive_traits(&derives, &order, true);
+        let expected = vec![
+            // head
+            dt("B", "B"),
+            dt("G", "G"),
+            // ellipsis
+            dt("E", "E"),
+            dt("F", "F"),
+            dt("C", "C"),
+            // tail
+            dt("D", "D"),
+            dt("A", "A"),
         ];
         assert_eq!(actual, expected);
     }
