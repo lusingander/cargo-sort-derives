@@ -58,8 +58,17 @@ impl From<Color> for process::OutputColor {
     }
 }
 
-fn read_custom_order<'a>(config: &'a Config, args: &'a SortDerivesArgs) -> Option<Vec<String>> {
-    args.order.clone().map(parse_order).or(config.order.clone())
+fn read_custom_order<'a>(
+    config: &'a Config,
+    args: &'a SortDerivesArgs,
+) -> Result<Option<Vec<String>>, String> {
+    let order = args.order.clone().map(parse_order).or(config.order.clone());
+    if let Some(order) = &order {
+        if order.iter().filter(|s| *s == "...").count() > 1 {
+            return Err("Only one '...' is allowed in the custom order".to_string());
+        }
+    }
+    Ok(order)
 }
 
 fn read_preserve(config: &Config, args: &SortDerivesArgs) -> bool {
@@ -74,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli::SortDerives(args) = Cli::parse();
     let config = Config::load();
 
-    let custom_order = read_custom_order(&config, &args);
+    let custom_order = read_custom_order(&config, &args)?;
     let preserve = read_preserve(&config, &args);
     let exclude = read_exclude(&config);
     let path = args.path;
