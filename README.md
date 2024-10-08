@@ -99,6 +99,28 @@ struct Example;
 
 You can also specify the order in the `order` section of the [config file](#config).
 
+#### Ellipsis
+
+If you specify an ellipsis (`...`), the `derive` attributes before it will be placed at the beginning, the elements after it will be placed at the end, and the remaining will be sorted alphabetically (if `--preserve` option is not specified).
+
+```
+$ cargo sort-derives --order "Eq, ..., Default, Clone"
+```
+
+This will reorder the `derive` attributes as follows:
+
+```rs
+// Before:
+#[derive(Debug, Clone, Copy, Default, Eq)]
+struct Example;
+
+// After: "Eq" at the beginning, "Default, Clone" at the end, in that order, with the rest in between in alphabetical order.
+#[derive(Eq, Copy, Debug, Default, Clone)]
+struct Example;
+```
+
+Ellipsis (`...`) cannot be specified multiple times.
+
 ### Check without updates
 
 <img src="./img/check.gif" width=600>
