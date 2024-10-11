@@ -16,7 +16,7 @@ pub struct Config {
 impl From<InternalConfig> for Config {
     fn from(internal_config: InternalConfig) -> Self {
         Config {
-            order: internal_config.order.map(OrderType::into_vec),
+            order: internal_config.order.map(Into::into),
             preserve: internal_config.preserve,
             exclude: internal_config.exclude,
         }
@@ -37,9 +37,9 @@ enum OrderType {
     Array(Vec<String>),
 }
 
-impl OrderType {
-    fn into_vec(self) -> Vec<String> {
-        match self {
+impl From<OrderType> for Vec<String> {
+    fn from(order_type: OrderType) -> Self {
+        match order_type {
             OrderType::String(s) => parse_order(s),
             OrderType::Array(ss) => ss,
         }
