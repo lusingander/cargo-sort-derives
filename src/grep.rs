@@ -105,7 +105,7 @@ struct SearchSink<'a> {
     file_path: &'a Path,
 }
 
-impl<'a> Sink for SearchSink<'a> {
+impl Sink for SearchSink<'_> {
     type Error = std::io::Error;
 
     fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
