@@ -29,6 +29,7 @@ Options:
       --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)
       --check          Check if the derive attributes are sorted
       --color <TYPE>   Use colored output [default: auto] [possible values: auto, always, never]
+      --config <FILE>  The path to the config file
   -h, --help           Print help
   -V, --version        Print version
 ```
@@ -152,6 +153,8 @@ You can specify files to exclude in the `exclude` section of the [config file](#
 ### Config
 
 If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, the config will be loaded.
+
+You can also specify a configuration file with the `--config` option. In this case, the specified file will be read with priority.
 
 #### Format
 
