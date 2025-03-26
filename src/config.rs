@@ -47,13 +47,18 @@ impl From<OrderType> for Vec<String> {
 }
 
 impl Config {
-    pub fn load() -> Config {
-        let base_dir_path = std::env::current_dir().unwrap();
-        let config_file_paths = CONFIG_FILE_NAMES
-            .iter()
-            .map(|p| base_dir_path.join(p))
-            .collect();
-        load_from(config_file_paths)
+    pub fn load(config_file_path: &Option<String>) -> Config {
+        let paths = config_file_path
+            .as_ref()
+            .map(|p| vec![PathBuf::from(p)])
+            .unwrap_or_else(|| {
+                let base_dir_path = std::env::current_dir().unwrap();
+                CONFIG_FILE_NAMES
+                    .iter()
+                    .map(|p| base_dir_path.join(p))
+                    .collect()
+            });
+        load_from(paths)
     }
 }
 

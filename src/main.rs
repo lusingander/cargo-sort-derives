@@ -39,6 +39,10 @@ struct SortDerivesArgs {
     /// Use colored output
     #[clap(long, value_name = "TYPE", default_value = "auto")]
     color: Color,
+
+    /// The path to the config file
+    #[clap(long, value_name = "FILE")]
+    config: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -81,7 +85,7 @@ fn read_exclude(config: &Config) -> Vec<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli::SortDerives(args) = Cli::parse();
-    let config = Config::load();
+    let config = Config::load(&args.config);
 
     let custom_order = read_custom_order(&config, &args)?;
     let preserve = read_preserve(&config, &args);
