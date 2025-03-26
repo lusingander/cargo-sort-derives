@@ -48,13 +48,16 @@ impl From<OrderType> for Vec<String> {
 
 impl Config {
     pub fn load() -> Config {
-        load_from(std::env::current_dir().unwrap())
+        let base_dir_path = std::env::current_dir().unwrap();
+        let config_file_paths = CONFIG_FILE_NAMES
+            .iter()
+            .map(|p| base_dir_path.join(p))
+            .collect();
+        load_from(config_file_paths)
     }
 }
 
-fn load_from(path: PathBuf) -> Config {
-    let config_file_paths = CONFIG_FILE_NAMES.iter().map(|p| path.join(p)).collect();
-
+fn load_from(config_file_paths: Vec<PathBuf>) -> Config {
     if let Some(config_file_path) = first_exist_path(config_file_paths) {
         let config_file = std::fs::read_to_string(config_file_path).unwrap();
         let interal_config: InternalConfig = toml::from_str(&config_file).unwrap();
