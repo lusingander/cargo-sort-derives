@@ -26,6 +26,22 @@ fn test_default() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_order() -> Result<()> {
+    let dir = setup_input()?;
+
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(["--order", "Default, Debug"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    compare(dir, "order")?;
+
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();
