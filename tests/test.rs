@@ -42,6 +42,38 @@ fn test_order() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_order_head_ellipsis() -> Result<()> {
+    let dir = setup_input()?;
+
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(["--order", "..., Serialize, Deserialize"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    compare(dir, "order_head_ellipsis")?;
+
+    Ok(())
+}
+
+#[test]
+fn test_order_middle_ellipsis() -> Result<()> {
+    let dir = setup_input()?;
+
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(["--order", "Eq, ..., Serialize, Deserialize"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    compare(dir, "order_middle_ellipsis")?;
+
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();
