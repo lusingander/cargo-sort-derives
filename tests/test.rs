@@ -74,6 +74,22 @@ fn test_order_middle_ellipsis() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_order_preserve() -> Result<()> {
+    let dir = setup_input()?;
+
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(["--order", "Default, Debug", "--preserve"])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    compare(dir, "order_preserve")?;
+
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();
