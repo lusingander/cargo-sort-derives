@@ -15,97 +15,44 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[test]
 fn test_default() -> Result<()> {
     let dir = setup_input()?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "default")?;
-
-    Ok(())
+    execute(&[], dir.path())?;
+    compare(dir, "default")
 }
 
 #[test]
 fn test_order() -> Result<()> {
     let dir = setup_input()?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .args(["--order", "Default, Debug"])
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "order")?;
-
-    Ok(())
+    execute(&["--order", "Default, Debug"], dir.path())?;
+    compare(dir, "order")
 }
 
 #[test]
 fn test_order_head_ellipsis() -> Result<()> {
     let dir = setup_input()?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .args(["--order", "..., Serialize, Deserialize"])
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "order_head_ellipsis")?;
-
-    Ok(())
+    execute(&["--order", "..., Serialize, Deserialize"], dir.path())?;
+    compare(dir, "order_head_ellipsis")
 }
 
 #[test]
 fn test_order_middle_ellipsis() -> Result<()> {
     let dir = setup_input()?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .args(["--order", "Eq, ..., Serialize, Deserialize"])
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "order_middle_ellipsis")?;
-
-    Ok(())
+    execute(&["--order", "Eq, ..., Serialize, Deserialize"], dir.path())?;
+    compare(dir, "order_middle_ellipsis")
 }
 
 #[test]
 fn test_order_preserve() -> Result<()> {
     let dir = setup_input()?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .args(["--order", "Default, Debug", "--preserve"])
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "order_preserve")?;
-
-    Ok(())
+    execute(&["--order", "Default, Debug", "--preserve"], dir.path())?;
+    compare(dir, "order_preserve")
 }
 
 #[test]
 fn test_exclude() -> Result<()> {
     let dir = setup_input()?;
     let config_path = config_file_path("exclude.toml")?;
-
-    Command::cargo_bin(BIN_NAME)?
-        .arg(BASE_COMMAND_NAME)
-        .args(["--config", &config_path])
-        .current_dir(dir.path())
-        .assert()
-        .success();
-
-    compare(dir, "exclude")?;
-
-    Ok(())
+    execute(&["--config", &config_path], dir.path())?;
+    compare(dir, "exclude")
 }
 
 fn setup_input() -> Result<TempDir> {
@@ -141,6 +88,16 @@ fn collect_file_path_pairs(p1: &Path, p2: &Path) -> Result<Vec<(PathBuf, PathBuf
     let mut pairs = vec![];
     rec(p1, p2, &mut pairs)?;
     Ok(pairs)
+}
+
+fn execute(args: &[&str], current_dir: &Path) -> Result<()> {
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(args)
+        .current_dir(current_dir)
+        .assert()
+        .success();
+    Ok(())
 }
 
 fn compare(temp_dir: TempDir, expected_dir_name: &str) -> Result<()> {
