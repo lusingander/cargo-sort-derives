@@ -12,6 +12,8 @@ const PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
 
 const DISABLE_NEXT_LINE: &str = "sort-derives-disable-next-line";
+const DISABLE_START: &str = "sort-derives-disable-start";
+const DISABLE_END: &str = "sort-derives-disable-end";
 
 pub fn sort(
     file_path: &Path,
@@ -26,12 +28,13 @@ pub fn sort(
     let mut new_lines = Vec::with_capacity(line_numbers.len());
 
     let mut disable_next_line = false;
+    let mut disable_range = false;
 
     for (i, line) in reader.lines_with_terminator().enumerate() {
         let n = i + 1;
         let line = line?;
 
-        let new_line = if !disable_next_line && line_numbers.contains(&n) {
+        let new_line = if !disable_next_line && !disable_range && line_numbers.contains(&n) {
             let derives = parse_derive_traits(&line);
             let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
             replace_line(&line, &sorted_derives)
@@ -42,6 +45,13 @@ pub fn sort(
         disable_next_line = false;
         if line.contains(DISABLE_NEXT_LINE) {
             disable_next_line = true;
+        }
+
+        if line.contains(DISABLE_START) {
+            disable_range = true;
+        }
+        if line.contains(DISABLE_END) {
+            disable_range = false;
         }
 
         old_lines.push(line);
