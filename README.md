@@ -150,6 +150,13 @@ If the `.gitignore` or `.ignore` file exists, the files listed there will be exc
 
 You can specify files to exclude in the `exclude` section of the [config file](#config).
 
+### Ignore lines and ranges
+
+You can exclude parts of your code from being sorted by including certain strings:
+
+- `sort-derives-disable-next-line`: Ignore the next line of this string
+- `sort-derives-disable-start` / `sort-derives-disable-end`: Ignore the lines between start and end
+
 ### Config
 
 If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, the config will be loaded.
