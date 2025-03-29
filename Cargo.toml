@@ -15,16 +15,16 @@ rust-version = "1.80.0"
 exclude = ["/.github", "/img", "_config.yml", "tests", "fixtures"]
 
 [dependencies]
-clap = { version = "4.5.21", features = ["derive"] }
-console = "0.15.8"
+clap = { version = "4.5.34", features = ["derive"] }
+console = "0.15.11"
 grep-matcher = "0.1.7"
 grep-regex = "0.1.13"
 grep-searcher = "0.1.14"
 ignore = "0.4.23"
 regex = "1.11.1"
-serde = { version = "1.0.215", features = ["derive"] }
-similar = "2.6.0"
-toml = "0.8.19"
+serde = { version = "1.0.219", features = ["derive"] }
+similar = "2.7.0"
+toml = "0.8.20"
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
