@@ -8,6 +8,7 @@ const BIN_NAME: &str = "cargo-sort-derives";
 const BASE_COMMAND_NAME: &str = "sort-derives";
 const INPUT_DIR: &str = "fixtures/input";
 const EXPECTED_BASE_DIR: &str = "fixtures/expected";
+const CONFIG_DIR: &str = "tests/config";
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -90,12 +91,35 @@ fn test_order_preserve() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_exclude() -> Result<()> {
+    let dir = setup_input()?;
+    let config_path = config_file_path("exclude.toml")?;
+
+    Command::cargo_bin(BIN_NAME)?
+        .arg(BASE_COMMAND_NAME)
+        .args(["--config", &config_path])
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    compare(dir, "exclude")?;
+
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();
     let input_dir = Path::new(INPUT_DIR);
     copy_dir(input_dir, temp_dir_path)?;
     Ok(temp_dir)
+}
+
+fn config_file_path(file_name: &str) -> Result<String> {
+    let current_dir = std::env::current_dir()?;
+    let config_path = current_dir.join(CONFIG_DIR).join(file_name);
+    Ok(config_path.to_string_lossy().into())
 }
 
 fn collect_file_path_pairs(p1: &Path, p2: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
