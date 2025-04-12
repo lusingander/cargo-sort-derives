@@ -75,7 +75,7 @@ fn parse_derive_traits(line: &str) -> Vec<DeriveTrait> {
         .split(',')
         .map(|s| s.trim())
         .map(|s| {
-            let base_name = s.split(':').last().unwrap();
+            let base_name = s.split(':').next_back().unwrap();
             DeriveTrait {
                 s: s.into(),
                 base_name: base_name.into(),
