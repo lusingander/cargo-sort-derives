@@ -137,6 +137,7 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
     RE.replace(line, sorted_derive_str).into()
 }
 
+// sort-derives-disable-start
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,3 +420,4 @@ mod tests {
         }
     }
 }
+// sort-derives-disable-end
