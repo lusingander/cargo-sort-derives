@@ -12,10 +12,7 @@ args = ["sort-derives", "--check"]
 
 [tasks.test]
 command = "cargo"
-args = ["test", "--verbose"]
+args = ["test"]
 
 [tasks.lint]
-dependencies = ["fmt-check", "clippy"]
-
-[tasks.ci]
-dependencies = ["lint", "sort-derives-check", "test"]
+dependencies = ["fmt-check", "clippy", "sort-derives-check"]
