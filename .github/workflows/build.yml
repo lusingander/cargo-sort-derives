@@ -38,17 +38,23 @@ jobs:
           toolchain: ${{ matrix.versions }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install commands
+        run: |
+          cargo install --locked cargo-sort-derives
       - name: Version
         run: |
           rustc --version
           cargo --version
           cargo fmt -- --version
           cargo clippy -- --version
+          cargo sort-derives --version
       - name: Format
         run: cargo fmt --all -- --check
       - name: Build
         run: cargo build --verbose
       - name: Lint
         run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Sort derives
+        run: cargo sort-derives --check
       - name: Run tests
         run: cargo test --verbose
