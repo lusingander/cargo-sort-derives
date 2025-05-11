@@ -6,6 +6,10 @@ args = ["fmt", "--all", "--", "--check"]
 command = "cargo"
 args = ["clippy", "--all-targets", "--all-features", "--", "-D", "warnings"]
 
+[tasks.sort-derives-check]
+command = "cargo"
+args = ["sort-derives", "--check"]
+
 [tasks.test]
 command = "cargo"
 args = ["test", "--verbose"]
@@ -14,4 +18,4 @@ args = ["test", "--verbose"]
 dependencies = ["fmt-check", "clippy"]
 
 [tasks.ci]
-dependencies = ["lint", "test"]
+dependencies = ["lint", "sort-derives-check", "test"]
