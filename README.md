@@ -8,7 +8,7 @@ Cargo subcommand to sort derive attributes
 
 A Cargo subcommand that helps you consistently order `derive` attributes in your Rust code.
 
-This tool ensures that the `derive` attributes in your structs and enums are sorted in a consistent.
+This tool ensures that the `derive` attributes in your structs and enums are sorted in a consistent way.
 
 ## Installation
 
