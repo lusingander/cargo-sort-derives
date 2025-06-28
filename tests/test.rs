@@ -117,6 +117,6 @@ fn compare(temp_dir: TempDir, expected_dir_name: &str) -> Result<()> {
     if not_matched_files.is_empty() {
         Ok(())
     } else {
-        Err(format!("Not matched files: {:?}", not_matched_files).into())
+        Err(format!("Not matched files: {not_matched_files:?}").into())
     }
 }

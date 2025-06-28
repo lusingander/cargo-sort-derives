@@ -31,7 +31,7 @@ fn grep_all_files<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Match
     let mut override_builder = OverrideBuilder::new(root.as_ref());
     for glob in exclude {
         override_builder
-            .add(&format!("!{}", glob))
+            .add(&format!("!{glob}"))
             .map_err(|e| e.to_string())?;
     }
 

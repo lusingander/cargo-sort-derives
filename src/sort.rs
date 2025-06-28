@@ -133,7 +133,7 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
         .map(|d| d.s.as_str())
         .collect::<Vec<_>>()
         .join(", ");
-    let sorted_derive_str = format!("#[derive({})]", sorted_derive_str);
+    let sorted_derive_str = format!("#[derive({sorted_derive_str})]");
     RE.replace(line, sorted_derive_str).into()
 }
 

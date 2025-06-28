@@ -28,7 +28,7 @@ pub fn process(
     }
 
     for line in diffs {
-        print!("{}", line);
+        print!("{line}");
     }
 
     Ok(false)
