@@ -15,8 +15,8 @@ rust-version = "1.80.0"
 exclude = ["/.github", "/img", "_config.yml", "tests", "fixtures"]
 
 [dependencies]
-clap = { version = "4.5.38", features = ["derive"] }
-console = "0.15.11"
+clap = { version = "4.5.45", features = ["derive"] }
+console = "0.16.0"
 grep-matcher = "0.1.7"
 grep-regex = "0.1.13"
 grep-searcher = "0.1.14"
@@ -24,7 +24,7 @@ ignore = "0.4.23"
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
 similar = "2.7.0"
-toml = "0.8.22"
+toml = "0.9.5"
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
