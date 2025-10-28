@@ -17,6 +17,10 @@ pub fn process(
     check: bool,
     output_color: OutputColor,
 ) -> Result<bool, std::io::Error> {
+    if new_lines == old_lines {
+        return Ok(true);
+    }
+
     if !check {
         write_file(file_path, new_lines)?;
         return Ok(true);
