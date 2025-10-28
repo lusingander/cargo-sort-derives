@@ -51,7 +51,7 @@ fn grep_single_file<P: AsRef<Path>>(path: P) -> Result<Matches, String> {
         return Err(format!("{} is a directory", path.display()));
     }
 
-    if path.extension().map_or(true, |ext| ext != "rs") {
+    if path.extension().is_none_or(|ext| ext != "rs") {
         return Err(format!("{} is not a Rust source file", path.display()));
     }
 
