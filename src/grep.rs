@@ -6,7 +6,7 @@ use std::{
 
 use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
-use ignore::{overrides::OverrideBuilder, types::TypesBuilder, WalkBuilder, WalkParallel};
+use ignore::{WalkBuilder, WalkParallel, overrides::OverrideBuilder, types::TypesBuilder};
 
 const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
 
