@@ -8,7 +8,7 @@ use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
 use ignore::{WalkBuilder, WalkParallel, overrides::OverrideBuilder, types::TypesBuilder};
 
-const PATTERN: &str = r"#\[derive\([^\)]+\)\]";
+const PATTERN: &str = r"#\[(?:derive\([^\)]+\)|cfg_attr\(.+,\s*derive\([^\)]+\)\))";
 
 pub type Matches = Vec<(PathBuf, HashSet<usize>)>;
 
@@ -291,8 +291,14 @@ mod tests {
 
         #[derive(Clone, Copy)]
         struct B;
+        
+        #[cfg_attr(feature = "extra", derive(PartialEq, Eq))]
+        struct C;
+        
+        #[cfg_attr(all(feature = "serde", not(test)), derive(Serialize, Deserialize))]
+        struct D;
         "#;
-        let derive_lines = HashSet::from([2, 5]);
+        let derive_lines = HashSet::from([2, 5, 8, 11]);
         (source, derive_lines)
     }
 

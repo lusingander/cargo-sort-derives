@@ -8,8 +8,11 @@ use regex::Regex;
 
 use crate::ext::BufReadExt;
 
-const PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
-static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(PATTERN).unwrap());
+const DERIVE_PATTERN: &str = r"#\[derive\(\s*([^\)]+?)\s*\)\]";
+const CFG_ATTR_PATTERN: &str = r"#\[cfg_attr\((.+),\s*derive\(\s*([^\)]+?)\s*\)\)\]";
+
+static DERIVE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(DERIVE_PATTERN).unwrap());
+static CFG_ATTR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(CFG_ATTR_PATTERN).unwrap());
 
 const DISABLE_NEXT_LINE: &str = "sort-derives-disable-next-line";
 const DISABLE_START: &str = "sort-derives-disable-start";
@@ -35,9 +38,12 @@ pub fn sort(
         let line = line?;
 
         let new_line = if !disable_next_line && !disable_range && line_numbers.contains(&n) {
-            let derives = parse_derive_traits(&line);
-            let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
-            replace_line(&line, &sorted_derives)
+            if let Some(derives) = parse_derive_traits(&line) {
+                let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
+                replace_line(&line, &sorted_derives)
+            } else {
+                line.clone()
+            }
         } else {
             line.clone()
         };
@@ -67,21 +73,28 @@ struct DeriveTrait {
     base_name: String,
 }
 
-fn parse_derive_traits(line: &str) -> Vec<DeriveTrait> {
-    let caps = RE.captures(line).unwrap();
-    caps.get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .map(|s| s.trim())
-        .map(|s| {
-            let base_name = s.split(':').next_back().unwrap();
-            DeriveTrait {
-                s: s.into(),
-                base_name: base_name.into(),
-            }
-        })
-        .collect()
+fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
+    let derives_str = if let Some(caps) = DERIVE_RE.captures(line) {
+        caps.get(1).map(|m| m.as_str())
+    } else if let Some(caps) = CFG_ATTR_RE.captures(line) {
+        caps.get(2).map(|m| m.as_str())
+    } else {
+        None
+    };
+
+    derives_str.map(|s| {
+        s.split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let base_name = s.split(':').next_back().unwrap_or(s);
+                DeriveTrait {
+                    s: s.into(),
+                    base_name: base_name.into(),
+                }
+            })
+            .collect()
+    })
 }
 
 fn sort_derive_traits(
@@ -133,8 +146,19 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
         .map(|d| d.s.as_str())
         .collect::<Vec<_>>()
         .join(", ");
-    let sorted_derive_str = format!("#[derive({sorted_derive_str})]");
-    RE.replace(line, sorted_derive_str).into()
+
+    if let Some(_caps) = DERIVE_RE.captures(line) {
+        let replacement = format!("#[derive({sorted_derive_str})]");
+        return DERIVE_RE.replace(line, replacement).into();
+    }
+
+    if let Some(caps) = CFG_ATTR_RE.captures(line) {
+        let condition = caps.get(1).unwrap().as_str();
+        let replacement = format!("#[cfg_attr({condition}, derive({sorted_derive_str}))]");
+        return CFG_ATTR_RE.replace(line, replacement).into();
+    }
+
+    line.to_string()
 }
 
 // sort-derives-disable-start
@@ -145,7 +169,7 @@ mod tests {
     #[test]
     fn test_parse_derive_traits() {
         let line = "#[derive(Debug, cmp::Eq, Foo, std::clone::Clone, Hash, cmp::PartialOrd, foo::bar::Bar)]";
-        let actual = parse_derive_traits(line);
+        let actual = parse_derive_traits(line).unwrap();
         let expected = vec![
             dt("Debug", "Debug"),
             dt("cmp::Eq", "Eq"),
@@ -154,6 +178,29 @@ mod tests {
             dt("Hash", "Hash"),
             dt("cmp::PartialOrd", "PartialOrd"),
             dt("foo::bar::Bar", "Bar"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_derive_traits_with_cfg_attr() {
+        let line = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]";
+        let actual = parse_derive_traits(line).unwrap();
+        let expected = vec![
+            dt("Serialize", "Serialize"),
+            dt("Deserialize", "Deserialize"),
+        ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_derive_traits_with_complex_cfg_attr() {
+        let line = "#[cfg_attr(all(feature = \"serde\", not(test)), derive(serde::Serialize, serde::Deserialize, Debug))]";
+        let actual = parse_derive_traits(line).unwrap();
+        let expected = vec![
+            dt("serde::Serialize", "Serialize"),
+            dt("serde::Deserialize", "Deserialize"),
+            dt("Debug", "Debug"),
         ];
         assert_eq!(actual, expected);
     }
@@ -410,6 +457,31 @@ mod tests {
             dt("D", "D"),
             dt("A", "A"),
         ];
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_replace_line_with_cfg_attr() {
+        let line = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]";
+        let sorted_derives = vec![
+            dt("Deserialize", "Deserialize"),
+            dt("Serialize", "Serialize"),
+        ];
+        let actual = replace_line(line, &sorted_derives);
+        let expected = "#[cfg_attr(feature = \"serde\", derive(Deserialize, Serialize))]";
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_replace_line_with_complex_cfg_attr() {
+        let line = "#[cfg_attr(all(feature = \"serde\", not(test)), derive(serde::Serialize, serde::Deserialize, Debug))]";
+        let sorted_derives = vec![
+            dt("Debug", "Debug"),
+            dt("serde::Deserialize", "Deserialize"),
+            dt("serde::Serialize", "Serialize"),
+        ];
+        let actual = replace_line(line, &sorted_derives);
+        let expected = "#[cfg_attr(all(feature = \"serde\", not(test)), derive(Debug, serde::Deserialize, serde::Serialize))]";
         assert_eq!(actual, expected);
     }
 
