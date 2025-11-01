@@ -295,7 +295,7 @@ mod tests {
         #[cfg_attr(feature = "extra", derive(PartialEq, Eq))]
         struct C;
         
-        #[cfg_attr(all(feature = "serde", not(test)), derive(Serialize, Deserialize))]
+        #[cfg_attr(all(feature = "serde", not(test)), derive(Deserialize, Serialize))]
         struct D;
         "#;
         let derive_lines = HashSet::from([2, 5, 8, 11]);
