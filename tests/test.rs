@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use dircpy::copy_dir;
 use tempfile::TempDir;
 
-const BIN_NAME: &str = "cargo-sort-derives";
 const BASE_COMMAND_NAME: &str = "sort-derives";
 const INPUT_DIR: &str = "fixtures/input";
 const EXPECTED_BASE_DIR: &str = "fixtures/expected";
@@ -91,7 +90,7 @@ fn collect_file_path_pairs(p1: &Path, p2: &Path) -> Result<Vec<(PathBuf, PathBuf
 }
 
 fn execute(args: &[&str], current_dir: &Path) -> Result<()> {
-    Command::cargo_bin(BIN_NAME)?
+    cargo_bin_cmd!()
         .arg(BASE_COMMAND_NAME)
         .args(args)
         .current_dir(current_dir)
