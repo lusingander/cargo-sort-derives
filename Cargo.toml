@@ -1,6 +1,6 @@
 [package]
 name = "cargo-sort-derives"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
 description = "Cargo subcommand to sort derive attributes"
 authors = ["Kyosuke Fujimoto <kyoro.f@gmail.com>"]
