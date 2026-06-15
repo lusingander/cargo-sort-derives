@@ -110,10 +110,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if stdin {
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input)?;
+        // stdin input is already the whole target, so file discovery via grep is not needed.
         let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
 
         if check {
             if !process(
+                // process only uses this path when rendering check diffs.
                 Path::new("<stdin>"),
                 old_lines,
                 new_lines,
