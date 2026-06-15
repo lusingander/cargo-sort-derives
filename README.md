@@ -28,6 +28,7 @@ Options:
                        Any derives not listed will appear at the end in alphabetical order by default
       --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)
       --check          Check if the derive attributes are sorted
+      --stdin          Read Rust source from stdin and write formatted source to stdout
       --color <TYPE>   Use colored output [default: auto] [possible values: auto, always, never]
       --config <FILE>  The path to the config file
   -h, --help           Print help
@@ -143,6 +144,23 @@ $ cargo sort-derives --path ./path/to/file.rs
 You can sort only the files specified by the `--path` option.
 
 You cannot specify a directory or multiple paths. Also, all [exclusions](#exclude-targets) are ignored.
+
+### Read from stdin
+
+```
+$ cargo sort-derives --stdin < src/lib.rs
+```
+
+This reads Rust source code from stdin and writes the sorted result to stdout.
+Files are not updated when this option is used.
+
+You can also check stdin input without writing the sorted result:
+
+```
+$ cargo sort-derives --stdin --check < src/lib.rs
+```
+
+If the attributes are out of order, the command will print a diff and exit with a non-zero status code.
 
 ### Exclude targets
 
