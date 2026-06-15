@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    io::BufRead,
     path::Path,
     sync::LazyLock,
 };
@@ -26,9 +27,27 @@ pub fn sort(
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
     let file = std::fs::File::open(file_path)?;
     let reader = std::io::BufReader::new(file);
+    sort_reader(reader, Some(&line_numbers), custom_order, preserve)
+}
 
-    let mut old_lines = Vec::with_capacity(line_numbers.len());
-    let mut new_lines = Vec::with_capacity(line_numbers.len());
+pub fn sort_stdin(
+    input: &str,
+    custom_order: &Option<Vec<String>>,
+    preserve: bool,
+) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+    let reader = std::io::Cursor::new(input);
+    sort_reader(reader, None, custom_order, preserve)
+}
+
+fn sort_reader<R: BufRead>(
+    reader: R,
+    line_numbers: Option<&HashSet<usize>>,
+    custom_order: &Option<Vec<String>>,
+    preserve: bool,
+) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
+    let capacity = line_numbers.map_or(0, HashSet::len);
+    let mut old_lines = Vec::with_capacity(capacity);
+    let mut new_lines = Vec::with_capacity(capacity);
 
     let mut disable_next_line = false;
     let mut disable_range = false;
@@ -37,7 +56,8 @@ pub fn sort(
         let n = i + 1;
         let line = line?;
 
-        let new_line = if !disable_next_line && !disable_range && line_numbers.contains(&n) {
+        let should_sort = line_numbers.is_none_or(|line_numbers| line_numbers.contains(&n));
+        let new_line = if !disable_next_line && !disable_range && should_sort {
             if let Some(derives) = parse_derive_traits(&line) {
                 let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
                 replace_line(&line, &sorted_derives)

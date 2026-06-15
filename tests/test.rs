@@ -54,6 +54,45 @@ fn test_exclude() -> Result<()> {
     compare(dir, "exclude")
 }
 
+#[test]
+fn test_stdin() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("a.rs"))?;
+    let expected = std::fs::read_to_string(Path::new(EXPECTED_BASE_DIR).join("default/a.rs"))?;
+
+    let assert = cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--stdin")
+        .current_dir(dir.path())
+        .write_stdin(input)
+        .assert()
+        .success();
+
+    assert_eq!(
+        String::from_utf8(assert.get_output().stdout.clone())?,
+        expected
+    );
+    Ok(())
+}
+
+#[test]
+fn test_stdin_check() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("a.rs"))?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--stdin")
+        .arg("--check")
+        .current_dir(dir.path())
+        .write_stdin(input)
+        .assert()
+        .failure()
+        .code(1);
+
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();

@@ -5,9 +5,17 @@ mod process;
 mod sort;
 mod util;
 
+use std::{io::Read, path::Path};
+
 use clap::{Args, Parser, ValueEnum};
 
-use crate::{config::Config, grep::grep, process::process, sort::sort, util::parse_order};
+use crate::{
+    config::Config,
+    grep::grep,
+    process::process,
+    sort::{sort, sort_stdin},
+    util::parse_order,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "cargo", bin_name = "cargo")]
@@ -35,6 +43,10 @@ struct SortDerivesArgs {
     /// Check if the derive attributes are sorted
     #[clap(long)]
     check: bool,
+
+    /// Read Rust source from stdin and write formatted source to stdout
+    #[clap(long, conflicts_with = "path")]
+    stdin: bool,
 
     /// Use colored output
     #[clap(long, value_name = "TYPE", default_value = "auto")]
@@ -92,7 +104,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let exclude = read_exclude(&config);
     let path = args.path;
     let check = args.check;
+    let stdin = args.stdin;
     let output_color = args.color.into();
+
+    if stdin {
+        let mut input = String::new();
+        std::io::stdin().read_to_string(&mut input)?;
+        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
+
+        if check {
+            if !process(
+                Path::new("<stdin>"),
+                old_lines,
+                new_lines,
+                true,
+                output_color,
+            )? {
+                std::process::exit(1);
+            }
+        } else {
+            print!("{}", new_lines.concat());
+        }
+
+        return Ok(());
+    }
 
     let mut no_diff = true;
     for (file_path, line_numbers) in grep(path, exclude)? {
