@@ -17,6 +17,7 @@ exclude = ["/.github", "/img", "_config.yml", "tests", "fixtures"]
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
 console = "0.16.3"
+dirs = "6"
 grep-matcher = "0.1.8"
 grep-regex = "0.1.14"
 grep-searcher = "0.1.16"

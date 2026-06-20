@@ -88,12 +88,12 @@ fn sort_reader<R: BufRead>(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct DeriveTrait {
-    s: String,
-    base_name: String,
+pub(crate) struct DeriveTrait {
+    pub s: String,
+    pub base_name: String,
 }
 
-fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
+pub(crate) fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
     let derives_str = if let Some(caps) = DERIVE_RE.captures(line) {
         caps.get(1).map(|m| m.as_str())
     } else if let Some(caps) = CFG_ATTR_RE.captures(line) {
