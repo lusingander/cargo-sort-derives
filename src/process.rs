@@ -1,101 +1,66 @@
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
-use console::Style;
-use similar::{ChangeTag, TextDiff};
-
-#[derive(Debug, Clone, Copy)]
-pub enum OutputColor {
-    Auto,
-    Always,
-    Never,
+/// Per-derive-attribute information passed to the callback.
+pub struct DeriveChange<'a> {
+    pub file_path: &'a Path,
+    pub line: usize,
+    pub old_text: &'a str,
+    pub new_text: &'a str,
 }
 
+impl DeriveChange<'_> {
+    pub fn changed(&self) -> bool {
+        self.old_text != self.new_text
+    }
+}
+
+/// Process one file: call `on_derive` for each derive attribute,
+/// write the sorted source in non-check mode, and return whether
+/// the file was already sorted (always `true` in non-check mode).
 pub fn process(
     file_path: &Path,
     old: String,
     new: String,
     check: bool,
-    output_color: OutputColor,
+    derive_lines: &HashSet<usize>,
+    on_derive: &mut dyn FnMut(DeriveChange),
 ) -> Result<bool, std::io::Error> {
-    if new == old {
-        return Ok(true);
+    let old_lines: Vec<&str> = old.lines().collect();
+    let new_lines: Vec<&str> = new.lines().collect();
+
+    // Sort derive lines so the callback sees them in source order.
+    let mut sorted_derive_lines: Vec<usize> = derive_lines.iter().copied().collect();
+    sorted_derive_lines.sort_unstable();
+
+    // In non-check mode, notify the callback for every derive attribute.
+    if !check {
+        for &line in &sorted_derive_lines {
+            let i = line.saturating_sub(1);
+            let old_text = old_lines.get(i).copied().unwrap_or("");
+            let new_text = new_lines.get(i).copied().unwrap_or("");
+            on_derive(DeriveChange {
+                file_path,
+                line,
+                old_text,
+                new_text,
+            });
+        }
     }
 
     if !check {
-        write_file(file_path, new)?;
+        if new != old {
+            write_file(file_path, new)?;
+        }
         return Ok(true);
     }
 
-    let diffs = calc_diff_lines(file_path, old, new, output_color);
-    if diffs.is_empty() {
+    // Check mode: return whether anything changed.
+    if check && new == old {
         return Ok(true);
     }
-
-    for line in diffs {
-        print!("{line}");
-    }
-
     Ok(false)
 }
 
 fn write_file(file_path: &Path, new: String) -> Result<(), std::io::Error> {
     std::fs::write(file_path, new)
-}
-
-fn calc_diff_lines(
-    file_path: &Path,
-    old: String,
-    new: String,
-    output_color: OutputColor,
-) -> Vec<String> {
-    let diff = TextDiff::from_lines(&old, &new);
-
-    if diff.ratio() == 1.0 {
-        // no changes
-        return Vec::new();
-    }
-
-    let mut lines = Vec::new();
-    let (file_style, del_style, ins_style) = output_style(output_color);
-
-    for group in diff.grouped_ops(0).iter() {
-        for op in group {
-            for change in diff.iter_changes(op) {
-                if change.tag() == ChangeTag::Delete {
-                    // always consists of a pair of delete and insert lines, so we only need to print the file path once
-                    let line = format!(
-                        "--- {}:{}\n",
-                        file_path.display(),
-                        change.old_index().unwrap() + 1
-                    );
-                    lines.push(format!("{}", file_style.apply_to(line)));
-                }
-
-                let (line, style) = match change.tag() {
-                    ChangeTag::Delete => (format!("- {}", change.value()), del_style.clone()),
-                    ChangeTag::Insert => (format!("+ {}", change.value()), ins_style.clone()),
-                    ChangeTag::Equal => unreachable!(),
-                };
-                lines.push(format!("{}", style.apply_to(line)));
-            }
-        }
-    }
-
-    lines
-}
-
-fn output_style(output_color: OutputColor) -> (Style, Style, Style) {
-    match output_color {
-        OutputColor::Auto => (
-            Style::new().color256(244),
-            Style::new().red(),
-            Style::new().green(),
-        ),
-        OutputColor::Always => (
-            Style::new().force_styling(true).color256(244),
-            Style::new().force_styling(true).red(),
-            Style::new().force_styling(true).green(),
-        ),
-        OutputColor::Never => (Style::new(), Style::new(), Style::new()),
-    }
 }

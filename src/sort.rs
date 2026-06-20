@@ -1,35 +1,54 @@
 use crate::parse::{DeriveAttr, collect_derive_attrs};
 use std::collections::{HashMap, HashSet};
 
-/// Sort derive attributes in `source` using pre-collected `attrs`, return `(original, sorted)`.
+/// Compute 1-indexed source line numbers for each `DeriveAttr`.
+pub fn derive_line_numbers(source: &str, attrs: &[DeriveAttr]) -> HashSet<usize> {
+    let line_starts: Vec<usize> = std::iter::once(0)
+        .chain(source.match_indices('\n').map(|(i, _)| i + 1))
+        .collect();
+    attrs
+        .iter()
+        .map(|attr| {
+            line_starts
+                .binary_search(&attr.start)
+                .unwrap_or_else(|i| i.saturating_sub(1))
+                + 1
+        })
+        .collect()
+}
+
+/// Sort derive attributes in `source` using pre-collected `attrs`,
+/// return `(original, sorted, per_attr_changed)`.
 pub fn sort_source(
     source: String,
     attrs: &[DeriveAttr],
     custom_order: &Option<Vec<String>>,
     preserve: bool,
-) -> (String, String) {
+) -> (String, String, Vec<bool>) {
     let original = source.clone();
     let mut new_source = source;
 
     let order_map = build_order_map(custom_order);
 
-    let mut splices: Vec<(usize, usize, String)> = attrs
+    let mut splices: Vec<(usize, usize, String, bool)> = attrs
         .iter()
         .map(|attr| {
-            let replacement = sort_and_render_attr(attr, &order_map, preserve);
-            (attr.start, attr.end, replacement)
+            let (replacement, changed) = sort_and_render_attr(attr, &order_map, preserve);
+            (attr.start, attr.end, replacement, changed)
         })
         .collect();
     splices.sort_by(|a, b| b.0.cmp(&a.0));
 
-    for (start, end, replacement) in &splices {
+    for (start, end, replacement, _) in &splices {
         new_source.replace_range(*start..*end, replacement);
     }
 
-    (original, new_source)
+    let per_attr_changed: Vec<bool> = splices.into_iter().map(|(_, _, _, c)| c).collect();
+
+    (original, new_source, per_attr_changed)
 }
 
-fn compute_disabled_lines(source: &str) -> HashSet<usize> {
+pub(crate) fn compute_disabled_lines(source: &str) -> HashSet<usize> {
     let mut disabled = HashSet::new();
     let mut disable_next_line = false;
     let mut disable_range = false;
@@ -57,20 +76,17 @@ fn compute_disabled_lines(source: &str) -> HashSet<usize> {
     disabled
 }
 
-/// Sort derive attributes from stdin input, return `(original, sorted)`.
+/// Sort derive attributes from stdin input, return `(original, sorted, attrs, per_attr_changed)`.
 pub fn sort_stdin(
     input: &str,
     custom_order: &Option<Vec<String>>,
     preserve: bool,
-) -> syn::Result<(String, String)> {
+) -> syn::Result<(String, String, Vec<DeriveAttr>, Vec<bool>)> {
     let disabled_lines = compute_disabled_lines(input);
     let attrs = collect_derive_attrs(input, &disabled_lines)?;
-    Ok(sort_source(
-        input.to_string(),
-        &attrs,
-        custom_order,
-        preserve,
-    ))
+    let (original, sorted, changed) =
+        sort_source(input.to_string(), &attrs, custom_order, preserve);
+    Ok((original, sorted, attrs, changed))
 }
 
 const IGNORE: usize = 10_000;
@@ -111,7 +127,9 @@ fn sort_and_render_attr(
     attr: &DeriveAttr,
     order_map: &HashMap<String, usize>,
     preserve: bool,
-) -> String {
+) -> (String, bool) {
+    let original_strs: Vec<String> = attr.paths.iter().map(|p| path_to_string(p)).collect();
+
     let mut sorted_paths = attr.paths.clone();
     sorted_paths.sort_by(|a, b| {
         let base_a = path_base_name(a);
@@ -129,18 +147,18 @@ fn sort_and_render_attr(
         }
     });
 
-    let sorted_paths_str = sorted_paths
-        .iter()
-        .map(|p| path_to_string(p))
-        .collect::<Vec<_>>()
-        .join(", ");
+    let sorted_strs: Vec<String> = sorted_paths.iter().map(|p| path_to_string(p)).collect();
+    let changed = original_strs != sorted_strs;
 
-    match &attr.condition {
+    let sorted_paths_str = sorted_strs.join(", ");
+
+    let result = match &attr.condition {
         None => format!("#[derive({})]", sorted_paths_str),
         Some(condition) => {
             format!("#[cfg_attr({}, derive({}))]", condition, sorted_paths_str)
         }
-    }
+    };
+    (result, changed)
 }
 
 // sort-derives-disable-start
@@ -397,9 +415,10 @@ mod tests {
     fn test_sort_source_plain_derive() {
         let source = "#[derive(Debug, Clone, Copy)]\nstruct Foo;".to_string();
         let attrs = collect_derive_attrs(&source, &HashSet::new()).unwrap();
-        let (original, sorted) = sort_source(source, &attrs, &None, false);
+        let (original, sorted, changed) = sort_source(source, &attrs, &None, false);
         assert_eq!(original, "#[derive(Debug, Clone, Copy)]\nstruct Foo;");
         assert_eq!(sorted, "#[derive(Clone, Copy, Debug)]\nstruct Foo;");
+        assert_eq!(changed, vec![true]);
     }
 
     #[test]
@@ -409,7 +428,7 @@ mod tests {
                 .to_string();
         let attrs = collect_derive_attrs(&source, &HashSet::new()).unwrap();
         let cond_str = attrs[0].condition.as_ref().unwrap().to_string();
-        let (original, sorted) = sort_source(source, &attrs, &None, false);
+        let (original, sorted, changed) = sort_source(source, &attrs, &None, false);
         assert_eq!(
             original,
             "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]\nstruct Foo;"
@@ -421,6 +440,7 @@ mod tests {
                 cond_str
             )
         );
+        assert_eq!(changed, vec![true]);
     }
 
     #[test]
@@ -428,7 +448,7 @@ mod tests {
         let source = "#[cfg_attr(all(feature = \"serde\", not(test)), derive(serde::Serialize, serde::Deserialize, Debug))]\nstruct Foo;".to_string();
         let attrs = collect_derive_attrs(&source, &HashSet::new()).unwrap();
         let cond_str = attrs[0].condition.as_ref().unwrap().to_string();
-        let (original, sorted) = sort_source(source, &attrs, &None, false);
+        let (original, sorted, changed) = sort_source(source, &attrs, &None, false);
         assert_eq!(
             original,
             "#[cfg_attr(all(feature = \"serde\", not(test)), derive(serde::Serialize, serde::Deserialize, Debug))]\nstruct Foo;"
@@ -440,6 +460,7 @@ mod tests {
                 cond_str
             )
         );
+        assert_eq!(changed, vec![true]);
     }
 
     #[test]
@@ -447,24 +468,27 @@ mod tests {
         let source = "#[derive(Debug, Clone, Copy)]\nstruct Foo;".to_string();
         let attrs = collect_derive_attrs(&source, &HashSet::new()).unwrap();
         let order = Some(vec!["Copy".to_string(), "Debug".to_string()]);
-        let (_, sorted) = sort_source(source, &attrs, &order, false);
+        let (_, sorted, changed) = sort_source(source, &attrs, &order, false);
         assert_eq!(sorted, "#[derive(Copy, Debug, Clone)]\nstruct Foo;");
+        assert_eq!(changed, vec![true]);
     }
 
     #[test]
     fn test_sort_stdin_plain() {
         let input = "#[derive(Debug, Clone)]\nstruct Foo;";
-        let (original, sorted) = sort_stdin(input, &None, false).unwrap();
+        let (original, sorted, _attrs, changed) = sort_stdin(input, &None, false).unwrap();
         assert_eq!(original, "#[derive(Debug, Clone)]\nstruct Foo;");
         assert_eq!(sorted, "#[derive(Clone, Debug)]\nstruct Foo;");
+        assert_eq!(changed, vec![true]);
     }
 
     #[test]
     fn test_sort_source_multiline_derive() {
         let source = "#[derive(\n    Debug,\n    Clone,\n)]\nstruct Foo;".to_string();
         let attrs = collect_derive_attrs(&source, &HashSet::new()).unwrap();
-        let (_, sorted) = sort_source(source, &attrs, &None, false);
+        let (_, sorted, changed) = sort_source(source, &attrs, &None, false);
         assert_eq!(sorted, "#[derive(Clone, Debug)]\nstruct Foo;");
+        assert_eq!(changed, vec![true]);
     }
 }
 // sort-derives-disable-end
