@@ -19,6 +19,8 @@ const DISABLE_NEXT_LINE: &str = "sort-derives-disable-next-line";
 const DISABLE_START: &str = "sort-derives-disable-start";
 const DISABLE_END: &str = "sort-derives-disable-end";
 
+const IGNORE: usize = usize::MAX / 2;
+
 pub fn sort(
     file_path: &Path,
     line_numbers: HashSet<usize>,
@@ -122,8 +124,6 @@ fn sort_derive_traits(
     custom_order: &Option<Vec<String>>,
     preserve: bool,
 ) -> Vec<DeriveTrait> {
-    const IGNORE: &usize = &10_000; // large enough
-
     let order_map: HashMap<String, usize> = match custom_order {
         Some(custom_order) => {
             let head_order = custom_order
@@ -144,14 +144,14 @@ fn sort_derive_traits(
 
     let mut sorted_derives = derives.to_vec();
     sorted_derives.sort_by(|a, b| {
-        let priority_a = order_map.get(&a.base_name).unwrap_or(IGNORE);
-        let priority_b = order_map.get(&b.base_name).unwrap_or(IGNORE);
+        let priority_a = order_map.get(&a.base_name).copied().unwrap_or(IGNORE);
+        let priority_b = order_map.get(&b.base_name).copied().unwrap_or(IGNORE);
 
         if preserve && priority_a == IGNORE && priority_b == IGNORE {
             std::cmp::Ordering::Equal
         } else {
             priority_a
-                .cmp(priority_b)
+                .cmp(&priority_b)
                 .then_with(|| a.base_name.cmp(&b.base_name))
                 .then_with(|| a.s.cmp(&b.s))
         }
