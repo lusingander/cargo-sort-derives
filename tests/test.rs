@@ -101,6 +101,55 @@ fn setup_input() -> Result<TempDir> {
     Ok(temp_dir)
 }
 
+#[test]
+fn test_config_file_malformed_toml() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let config_path = temp_dir.path().join("malformed.toml");
+    std::fs::write(&config_path, "not valid toml {{{")?;
+
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--config")
+        .arg(config_path.to_string_lossy().as_ref())
+        .current_dir(dir.path())
+        .assert()
+        .failure();
+
+    Ok(())
+}
+
+#[test]
+fn test_config_file_nonexistent() -> Result<()> {
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--config")
+        .arg("/nonexistent/path/to/config.toml")
+        .current_dir(dir.path())
+        .assert()
+        .failure();
+
+    Ok(())
+}
+
+#[test]
+fn test_path_nonexistent() -> Result<()> {
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--path")
+        .arg("nosuch.rs")
+        .current_dir(dir.path())
+        .assert()
+        .failure();
+
+    Ok(())
+}
+
 fn config_file_path(file_name: &str) -> Result<String> {
     let current_dir = std::env::current_dir()?;
     let config_path = current_dir.join(CONFIG_DIR).join(file_name);
