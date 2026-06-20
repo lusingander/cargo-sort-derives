@@ -40,7 +40,7 @@ enum OrderType {
 impl From<OrderType> for Vec<String> {
     fn from(order_type: OrderType) -> Self {
         match order_type {
-            OrderType::String(s) => parse_order(s),
+            OrderType::String(s) => parse_order(&s),
             OrderType::Array(ss) => ss,
         }
     }
