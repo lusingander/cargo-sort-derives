@@ -40,35 +40,40 @@ enum OrderType {
 impl From<OrderType> for Vec<String> {
     fn from(order_type: OrderType) -> Self {
         match order_type {
-            OrderType::String(s) => parse_order(s),
+            OrderType::String(s) => parse_order(&s),
             OrderType::Array(ss) => ss,
         }
     }
 }
 
 impl Config {
-    pub fn load(config_file_path: &Option<String>) -> Config {
-        let paths = config_file_path
-            .as_ref()
-            .map(|p| vec![PathBuf::from(p)])
-            .unwrap_or_else(|| {
-                let base_dir_path = std::env::current_dir().unwrap();
-                CONFIG_FILE_NAMES
-                    .iter()
-                    .map(|p| base_dir_path.join(p))
-                    .collect()
-            });
+    pub fn load(config_file_path: Option<&String>) -> Result<Config, Box<dyn std::error::Error>> {
+        if let Some(p) = config_file_path {
+            let path = PathBuf::from(p);
+            if !path.exists() {
+                return Err(format!("Config file not found: {}", path.display()).into());
+            }
+            return load_from(vec![path]);
+        }
+
+        let base_dir_path = std::env::current_dir()?;
+        let paths: Vec<PathBuf> = CONFIG_FILE_NAMES
+            .iter()
+            .map(|p| base_dir_path.join(p))
+            .collect();
         load_from(paths)
     }
 }
 
-fn load_from(config_file_paths: Vec<PathBuf>) -> Config {
+fn load_from(config_file_paths: Vec<PathBuf>) -> Result<Config, Box<dyn std::error::Error>> {
     if let Some(config_file_path) = first_exist_path(config_file_paths) {
-        let config_file = std::fs::read_to_string(config_file_path).unwrap();
-        let interal_config: InternalConfig = toml::from_str(&config_file).unwrap();
-        interal_config.into()
+        let config_content = std::fs::read_to_string(&config_file_path)
+            .map_err(|e| format!("Failed to read {}: {e}", config_file_path.display()))?;
+        let internal_config: InternalConfig = toml::from_str(&config_content)
+            .map_err(|e| format!("Failed to parse {}: {e}", config_file_path.display()))?;
+        Ok(internal_config.into())
     } else {
-        Config::default()
+        Ok(Config::default())
     }
 }
 
@@ -127,7 +132,7 @@ mod tests {
     }
 
     fn deserialize_config(toml: &str) -> Config {
-        let interal_config: InternalConfig = toml::from_str(toml).unwrap();
-        interal_config.into()
+        let internal_config: InternalConfig = toml::from_str(toml).unwrap();
+        internal_config.into()
     }
 }
