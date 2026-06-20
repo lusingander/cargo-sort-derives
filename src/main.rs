@@ -77,11 +77,15 @@ impl From<Color> for process::OutputColor {
     }
 }
 
-fn read_custom_order<'a>(
-    config: &'a Config,
-    args: &'a SortDerivesArgs,
+fn read_custom_order(
+    config: &Config,
+    args: &SortDerivesArgs,
 ) -> Result<Option<Vec<String>>, String> {
-    let order = args.order.clone().map(parse_order).or(config.order.clone());
+    let order = args
+        .order
+        .as_deref()
+        .map(parse_order)
+        .or(config.order.clone());
     if let Some(order) = &order {
         if order.iter().filter(|s| *s == "...").count() > 1 {
             return Err("Only one '...' is allowed in the custom order".to_string());

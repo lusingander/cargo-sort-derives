@@ -1,4 +1,4 @@
-pub fn parse_order(order: String) -> Vec<String> {
+pub fn parse_order(order: &str) -> Vec<String> {
     order
         .split(',')
         .map(str::trim)
@@ -12,7 +12,7 @@ mod tests {
 
     #[test]
     fn test_parse_order() {
-        let order = "A, B, C".to_string();
+        let order = "A, B, C";
         let expected: Vec<String> = vec!["A", "B", "C"]
             .into_iter()
             .map(str::to_string)
