@@ -12,21 +12,21 @@ pub enum OutputColor {
 
 pub fn process(
     file_path: &Path,
-    old_lines: Vec<String>,
-    new_lines: Vec<String>,
+    old: String,
+    new: String,
     check: bool,
     output_color: OutputColor,
 ) -> Result<bool, std::io::Error> {
-    if new_lines == old_lines {
+    if new == old {
         return Ok(true);
     }
 
     if !check {
-        write_file(file_path, new_lines)?;
+        write_file(file_path, new)?;
         return Ok(true);
     }
 
-    let diffs = calc_diff_lines(file_path, old_lines, new_lines, output_color);
+    let diffs = calc_diff_lines(file_path, old, new, output_color);
     if diffs.is_empty() {
         return Ok(true);
     }
@@ -38,18 +38,16 @@ pub fn process(
     Ok(false)
 }
 
-fn write_file(file_path: &Path, new_lines: Vec<String>) -> Result<(), std::io::Error> {
-    std::fs::write(file_path, new_lines.concat())
+fn write_file(file_path: &Path, new: String) -> Result<(), std::io::Error> {
+    std::fs::write(file_path, new)
 }
 
 fn calc_diff_lines(
     file_path: &Path,
-    old_lines: Vec<String>,
-    new_lines: Vec<String>,
+    old: String,
+    new: String,
     output_color: OutputColor,
 ) -> Vec<String> {
-    let old = old_lines.concat();
-    let new = new_lines.concat();
     let diff = TextDiff::from_lines(&old, &new);
 
     if diff.ratio() == 1.0 {

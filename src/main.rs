@@ -1,5 +1,4 @@
 mod config;
-mod ext;
 mod grep;
 mod parse;
 mod process;
@@ -14,7 +13,7 @@ use crate::{
     config::Config,
     grep::grep,
     process::process,
-    sort::{sort, sort_stdin},
+    sort::{sort_source, sort_stdin},
     util::parse_order,
 };
 
@@ -126,7 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         } else {
-            print!("{}", new_lines.concat());
+            print!("{}", new_lines);
         }
 
         return Ok(());
@@ -134,7 +133,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut no_diff = true;
     for (file_path, attrs) in grep(path, exclude)? {
-        let (old_lines, new_lines) = sort(&file_path, &attrs, &custom_order, preserve)?;
+        let content = std::fs::read_to_string(&file_path)
+            .map_err(|e| format!("{}: {}", file_path.display(), e))?;
+        let (old_lines, new_lines) = sort_source(content, &attrs, &custom_order, preserve);
         no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
     }
 

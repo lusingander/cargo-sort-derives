@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Delimiter, TokenTree};
 use syn::Meta;
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 
-/// The condition tokens of a `cfg_attr(CONDITION, derive(...))` attribute,
+/// The condition text of a `cfg_attr(CONDITION, derive(...))` attribute,
 /// or `None` for a plain `derive(...)` attribute.
-pub type CfgCondition = Option<proc_macro2::TokenStream>;
+pub type CfgCondition = Option<String>;
 
 /// One sortable derive attribute, resolved to byte offsets in the source file.
 pub struct DeriveAttr {
@@ -16,7 +17,7 @@ pub struct DeriveAttr {
     pub end: usize,
     /// Derive paths in original order.
     pub paths: Vec<syn::Path>,
-    /// `Some(tokens)` for `cfg_attr` form, `None` for plain `derive`.
+    /// `Some(condition_text)` for `cfg_attr` form, `None` for plain `derive`.
     pub condition: CfgCondition,
 }
 
@@ -35,130 +36,70 @@ fn line_col_to_byte(source: &str, line: usize, col: usize) -> usize {
 ///
 /// `disabled_lines` is the set of 1-indexed source line numbers where sorting
 /// is suppressed (pre-computed by the caller from disable comments).
+///
+/// Uses `proc_macro2` token-level scanning so that files with custom proc-macro
+/// syntax (e.g. `duplicate_item`) are handled correctly — only individual
+/// `#[…]` attribute tokens are parsed with `syn`, not the entire file.
 pub fn collect_derive_attrs(
     source: &str,
     disabled_lines: &HashSet<usize>,
 ) -> syn::Result<Vec<DeriveAttr>> {
-    let file = syn::parse_file(source)?;
+    let tokens: proc_macro2::TokenStream = source.parse().map_err(|e: proc_macro2::LexError| {
+        syn::Error::new(proc_macro2::Span::call_site(), e.to_string())
+    })?;
+
     let mut attrs = Vec::new();
-    visit_items(&file.items, &mut attrs, source, disabled_lines)?;
+    collect_from_tokens(&mut tokens.into_iter(), &mut attrs, source, disabled_lines)?;
     attrs.sort_by_key(|a| a.start);
     Ok(attrs)
 }
 
-fn visit_items(
-    items: &[syn::Item],
-    results: &mut Vec<DeriveAttr>,
+/// Recursively walk a token-tree iterator, collecting derive attributes.
+fn collect_from_tokens(
+    iter: &mut dyn Iterator<Item = TokenTree>,
+    attrs: &mut Vec<DeriveAttr>,
     source: &str,
     disabled_lines: &HashSet<usize>,
 ) -> syn::Result<()> {
-    for item in items {
-        visit_item(item, results, source, disabled_lines)?;
+    while let Some(tt) = iter.next() {
+        if let TokenTree::Group(g) = &tt {
+            if g.delimiter() == Delimiter::Brace
+                || g.delimiter() == Delimiter::Bracket
+                || g.delimiter() == Delimiter::Parenthesis
+            {
+                collect_from_tokens(&mut g.stream().into_iter(), attrs, source, disabled_lines)?;
+            }
+        }
+
+        if !is_punct(&tt, '#') {
+            continue;
+        }
+        if let Some(next) = iter.next() {
+            // Skip inner attributes (#![…])
+            if is_punct(&next, '!') {
+                // Consume the bracket group that follows
+                let _group = iter.next();
+                continue;
+            }
+            if is_bracket_group(&next) {
+                let attr_tokens: proc_macro2::TokenStream = [tt, next].into_iter().collect();
+                if let Ok(parsed) = syn::Attribute::parse_outer.parse2(attr_tokens) {
+                    for attr in parsed {
+                        process_attribute(&attr, attrs, source, disabled_lines)?;
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
 
-fn visit_item(
-    item: &syn::Item,
-    results: &mut Vec<DeriveAttr>,
-    source: &str,
-    disabled_lines: &HashSet<usize>,
-) -> syn::Result<()> {
-    visit_attrs(&item_attrs(item), results, source, disabled_lines)?;
-
-    match item {
-        syn::Item::Mod(item_mod) => {
-            if let Some((_, items)) = &item_mod.content {
-                visit_items(items, results, source, disabled_lines)?;
-            }
-        }
-        syn::Item::Impl(item_impl) => {
-            for impl_item in &item_impl.items {
-                visit_attrs(&impl_item_attrs(impl_item), results, source, disabled_lines)?;
-            }
-        }
-        syn::Item::Trait(item_trait) => {
-            for trait_item in &item_trait.items {
-                visit_attrs(
-                    &trait_item_attrs(trait_item),
-                    results,
-                    source,
-                    disabled_lines,
-                )?;
-            }
-        }
-        syn::Item::Enum(item_enum) => {
-            for variant in &item_enum.variants {
-                visit_attrs(&variant.attrs, results, source, disabled_lines)?;
-            }
-        }
-        syn::Item::Struct(item_struct) => {
-            for field in item_struct.fields.iter() {
-                visit_attrs(&field.attrs, results, source, disabled_lines)?;
-            }
-        }
-        syn::Item::Union(item_union) => {
-            for field in item_union.fields.named.iter() {
-                visit_attrs(&field.attrs, results, source, disabled_lines)?;
-            }
-        }
-        _ => {}
-    }
-    Ok(())
+fn is_punct(tt: &TokenTree, c: char) -> bool {
+    matches!(tt, TokenTree::Punct(p) if p.as_char() == c)
 }
 
-/// Extract attrs from any syn::Item variant.
-fn item_attrs(item: &syn::Item) -> &[syn::Attribute] {
-    match item {
-        syn::Item::Const(i) => &i.attrs,
-        syn::Item::Enum(i) => &i.attrs,
-        syn::Item::ExternCrate(i) => &i.attrs,
-        syn::Item::Fn(i) => &i.attrs,
-        syn::Item::ForeignMod(i) => &i.attrs,
-        syn::Item::Impl(i) => &i.attrs,
-        syn::Item::Macro(i) => &i.attrs,
-        syn::Item::Mod(i) => &i.attrs,
-        syn::Item::Static(i) => &i.attrs,
-        syn::Item::Struct(i) => &i.attrs,
-        syn::Item::Trait(i) => &i.attrs,
-        syn::Item::TraitAlias(i) => &i.attrs,
-        syn::Item::Type(i) => &i.attrs,
-        syn::Item::Union(i) => &i.attrs,
-        syn::Item::Use(i) => &i.attrs,
-        _ => &[],
-    }
-}
-
-fn impl_item_attrs(item: &syn::ImplItem) -> &[syn::Attribute] {
-    match item {
-        syn::ImplItem::Const(i) => &i.attrs,
-        syn::ImplItem::Fn(i) => &i.attrs,
-        syn::ImplItem::Type(i) => &i.attrs,
-        syn::ImplItem::Macro(i) => &i.attrs,
-        _ => &[],
-    }
-}
-
-fn trait_item_attrs(item: &syn::TraitItem) -> &[syn::Attribute] {
-    match item {
-        syn::TraitItem::Const(i) => &i.attrs,
-        syn::TraitItem::Fn(i) => &i.attrs,
-        syn::TraitItem::Type(i) => &i.attrs,
-        syn::TraitItem::Macro(i) => &i.attrs,
-        _ => &[],
-    }
-}
-
-fn visit_attrs(
-    attrs: &[syn::Attribute],
-    results: &mut Vec<DeriveAttr>,
-    source: &str,
-    disabled_lines: &HashSet<usize>,
-) -> syn::Result<()> {
-    for attr in attrs {
-        process_attribute(attr, results, source, disabled_lines)?;
-    }
-    Ok(())
+fn is_bracket_group(tt: &TokenTree) -> bool {
+    matches!(tt, TokenTree::Group(g) if g.delimiter() == Delimiter::Bracket)
 }
 
 fn process_attribute(
@@ -228,8 +169,19 @@ fn process_cfg_attr_derive(
             return Ok(());
         };
 
-        let condition: TokenStream = tt_vec[..idx].iter().cloned().collect();
-        let derive_tokens: TokenStream = tt_vec[idx + 1..].iter().cloned().collect();
+        // Extract condition text from source using span byte offsets to preserve formatting.
+        let comma_span = match &tt_vec[idx] {
+            TokenTree::Punct(p) => p.span(),
+            _ => return Ok(()),
+        };
+        let condition_start = tt_vec[0].span().start();
+        let condition_start_byte =
+            line_col_to_byte(source, condition_start.line, condition_start.column);
+        let condition_end_byte =
+            line_col_to_byte(source, comma_span.start().line, comma_span.start().column);
+        let condition: String = source[condition_start_byte..condition_end_byte].to_string();
+
+        let derive_tokens: proc_macro2::TokenStream = tt_vec[idx + 1..].iter().cloned().collect();
 
         let derive_meta: Meta = syn::parse2(derive_tokens)?;
         if !derive_meta.path().is_ident("derive") {
@@ -289,8 +241,7 @@ mod tests {
         assert_eq!(first_segment(&attrs[0].paths[1]), "Deserialize");
 
         assert!(attrs[0].condition.is_some());
-        let cond_str = attrs[0].condition.as_ref().unwrap().to_string();
-        assert!(cond_str.contains("feature"));
+        assert_eq!(attrs[0].condition.as_ref().unwrap(), "feature = \"serde\"");
 
         assert_eq!(attrs[0].start, source.find('#').unwrap());
         assert_eq!(attrs[0].end, source.rfind(']').unwrap() + 1);
