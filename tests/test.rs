@@ -60,10 +60,12 @@ fn test_stdin() -> Result<()> {
     let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("a.rs"))?;
     let expected = std::fs::read_to_string(Path::new(EXPECTED_BASE_DIR).join("default/a.rs"))?;
 
+    let config_home = tempfile::tempdir()?;
     let assert = cargo_bin_cmd!()
         .arg(BASE_COMMAND_NAME)
         .arg("--stdin")
         .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
         .write_stdin(input)
         .assert()
         .success();
@@ -80,15 +82,136 @@ fn test_stdin_check() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("a.rs"))?;
 
+    let config_home = tempfile::tempdir()?;
     cargo_bin_cmd!()
         .arg(BASE_COMMAND_NAME)
         .arg("--stdin")
         .arg("--check")
         .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
         .write_stdin(input)
         .assert()
         .failure()
         .code(1);
+
+    Ok(())
+}
+
+#[test]
+fn test_global_config_order() -> Result<()> {
+    let config_home = tempfile::tempdir()?;
+    std::fs::write(
+        config_home.path().join("cargo-sort-derives.toml"),
+        r#"order = "GlobalA, GlobalB""#,
+    )?;
+
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .assert()
+        .success();
+
+    let expected_dir = setup_input()?;
+    execute(&["--order", "GlobalA, GlobalB"], expected_dir.path())?;
+
+    compare_two_dirs(dir.path(), expected_dir.path())
+}
+
+#[test]
+fn test_project_config_overrides_global() -> Result<()> {
+    let config_home = tempfile::tempdir()?;
+    std::fs::write(
+        config_home.path().join("cargo-sort-derives.toml"),
+        r#"order = "GlobalA, GlobalB""#,
+    )?;
+
+    let dir = setup_input()?;
+    std::fs::write(
+        dir.path().join(".sort-derives.toml"),
+        r#"order = ["ProjectX", "ProjectY"]"#,
+    )?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .assert()
+        .success();
+
+    let expected_dir = setup_input()?;
+    execute(&["--order", "ProjectX, ProjectY"], expected_dir.path())?;
+
+    compare_two_dirs(dir.path(), expected_dir.path())
+}
+
+#[test]
+fn test_no_user_config_skips_global() -> Result<()> {
+    let config_home = tempfile::tempdir()?;
+    std::fs::write(
+        config_home.path().join("cargo-sort-derives.toml"),
+        r#"order = "GlobalA, GlobalB""#,
+    )?;
+
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--no-user-config")
+        .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .assert()
+        .success();
+
+    let expected_dir = setup_input()?;
+    execute(&[], expected_dir.path())?;
+
+    compare_two_dirs(dir.path(), expected_dir.path())
+}
+
+#[test]
+fn test_cli_overrides_global() -> Result<()> {
+    let config_home = tempfile::tempdir()?;
+    std::fs::write(
+        config_home.path().join("cargo-sort-derives.toml"),
+        r#"order = "GlobalA, GlobalB""#,
+    )?;
+
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--order")
+        .arg("CliX, CliY")
+        .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .assert()
+        .success();
+
+    let expected_dir = setup_input()?;
+    execute(&["--order", "CliX, CliY"], expected_dir.path())?;
+
+    compare_two_dirs(dir.path(), expected_dir.path())
+}
+
+#[test]
+fn test_malformed_global_config_is_graceful() -> Result<()> {
+    let config_home = tempfile::tempdir()?;
+    std::fs::write(
+        config_home.path().join("cargo-sort-derives.toml"),
+        "this is not valid toml",
+    )?;
+
+    let dir = setup_input()?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .current_dir(dir.path())
+        .env("XDG_CONFIG_HOME", config_home.path())
+        .assert()
+        .success();
 
     Ok(())
 }
@@ -129,13 +252,51 @@ fn collect_file_path_pairs(p1: &Path, p2: &Path) -> Result<Vec<(PathBuf, PathBuf
 }
 
 fn execute(args: &[&str], current_dir: &Path) -> Result<()> {
+    let config_home = tempfile::tempdir()?;
     cargo_bin_cmd!()
         .arg(BASE_COMMAND_NAME)
         .args(args)
         .current_dir(current_dir)
+        .env("XDG_CONFIG_HOME", config_home.path())
         .assert()
         .success();
     Ok(())
+}
+
+fn compare_two_dirs(dir1: &Path, dir2: &Path) -> Result<()> {
+    let mut not_matched_files = vec![];
+
+    fn rec(dir1: &Path, dir2: &Path, not_matched: &mut Vec<String>) -> Result<()> {
+        if !dir2.is_dir() {
+            return Err(format!("{} is not a directory", dir2.display()).into());
+        }
+        for entry in dir1.read_dir()? {
+            let path1 = entry?.path();
+            let rel_name = path1.file_name().unwrap();
+            let path2 = dir2.join(rel_name);
+            if path1.is_dir() {
+                rec(&path1, &path2, not_matched)?;
+            } else if path1.extension().is_some_and(|ext| ext == "rs") {
+                if !path2.exists() {
+                    return Err(format!("{} does not exist", path2.display()).into());
+                }
+                let content1 = std::fs::read_to_string(&path1)?;
+                let content2 = std::fs::read_to_string(&path2)?;
+                if content1 != content2 {
+                    not_matched.push(rel_name.to_string_lossy().into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    rec(dir1, dir2, &mut not_matched_files)?;
+
+    if not_matched_files.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Not matched files: {not_matched_files:?}").into())
+    }
 }
 
 fn compare(temp_dir: TempDir, expected_dir_name: &str) -> Result<()> {
