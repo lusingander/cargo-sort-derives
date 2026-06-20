@@ -24,27 +24,27 @@ const IGNORE: usize = usize::MAX / 2;
 pub fn sort(
     file_path: &Path,
     line_numbers: HashSet<usize>,
-    custom_order: &Option<Vec<String>>,
+    order_map: &HashMap<String, usize>,
     preserve: bool,
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
     let file = std::fs::File::open(file_path)?;
     let reader = std::io::BufReader::new(file);
-    sort_reader(reader, Some(&line_numbers), custom_order, preserve)
+    sort_reader(reader, Some(&line_numbers), order_map, preserve)
 }
 
 pub fn sort_stdin(
     input: &str,
-    custom_order: &Option<Vec<String>>,
+    order_map: &HashMap<String, usize>,
     preserve: bool,
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
     let reader = std::io::Cursor::new(input);
-    sort_reader(reader, None, custom_order, preserve)
+    sort_reader(reader, None, order_map, preserve)
 }
 
 fn sort_reader<R: BufRead>(
     reader: R,
     line_numbers: Option<&HashSet<usize>>,
-    custom_order: &Option<Vec<String>>,
+    order_map: &HashMap<String, usize>,
     preserve: bool,
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
     let capacity = line_numbers.map_or(0, HashSet::len);
@@ -61,7 +61,7 @@ fn sort_reader<R: BufRead>(
         let should_sort = line_numbers.is_none_or(|line_numbers| line_numbers.contains(&n));
         let new_line = if !disable_next_line && !disable_range && should_sort {
             if let Some(derives) = parse_derive_traits(&line) {
-                let sorted_derives = sort_derive_traits(&derives, custom_order, preserve);
+                let sorted_derives = sort_derive_traits(&derives, order_map, preserve);
                 replace_line(&line, &sorted_derives)
             } else {
                 line.clone()
@@ -119,12 +119,8 @@ fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
     })
 }
 
-fn sort_derive_traits(
-    derives: &[DeriveTrait],
-    custom_order: &Option<Vec<String>>,
-    preserve: bool,
-) -> Vec<DeriveTrait> {
-    let order_map: HashMap<String, usize> = match custom_order {
+pub fn build_order_map(custom_order: Option<&Vec<String>>) -> HashMap<String, usize> {
+    match custom_order {
         Some(custom_order) => {
             let head_order = custom_order
                 .iter()
@@ -140,8 +136,14 @@ fn sort_derive_traits(
             head_order.chain(tail_order).collect()
         }
         None => HashMap::new(),
-    };
+    }
+}
 
+fn sort_derive_traits(
+    derives: &[DeriveTrait],
+    order_map: &HashMap<String, usize>,
+    preserve: bool,
+) -> Vec<DeriveTrait> {
     let mut sorted_derives = derives.to_vec();
     sorted_derives.sort_by(|a, b| {
         let priority_a = order_map.get(&a.base_name).copied().unwrap_or(IGNORE);
@@ -242,7 +244,8 @@ mod tests {
             dt("foo::bar::Bar", "Bar"),
         ];
         let order = None;
-        let actual = sort_derive_traits(&derives, &order, false);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, false);
         let expected = vec![
             dt("foo::bar::Bar", "Bar"),
             dt("std::clone::Clone", "Clone"),
@@ -292,7 +295,8 @@ mod tests {
             .map(Into::into)
             .collect(),
         );
-        let actual = sort_derive_traits(&derives, &order, false);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, false);
         let expected = vec![
             dt("Debug", "Debug"),
             dt("std::clone::Clone", "Clone"),
@@ -342,7 +346,8 @@ mod tests {
             .map(Into::into)
             .collect(),
         );
-        let actual = sort_derive_traits(&derives, &order, true);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, true);
         let expected = vec![
             dt("Debug", "Debug"),
             dt("std::clone::Clone", "Clone"),
@@ -372,7 +377,8 @@ mod tests {
             dt("G", "G"),
         ];
         let order = Some(vec!["...", "D", "A"].into_iter().map(Into::into).collect());
-        let actual = sort_derive_traits(&derives, &order, false);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, false);
         let expected = vec![
             // ellipsis
             dt("B", "B"),
@@ -404,7 +410,8 @@ mod tests {
                 .map(Into::into)
                 .collect(),
         );
-        let actual = sort_derive_traits(&derives, &order, false);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, false);
         let expected = vec![
             // head
             dt("B", "B"),
@@ -432,7 +439,8 @@ mod tests {
             dt("G", "G"),
         ];
         let order = Some(vec!["B", "G", "..."].into_iter().map(Into::into).collect());
-        let actual = sort_derive_traits(&derives, &order, false);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, false);
         let expected = vec![
             // head
             dt("B", "B"),
@@ -464,7 +472,8 @@ mod tests {
                 .map(Into::into)
                 .collect(),
         );
-        let actual = sort_derive_traits(&derives, &order, true);
+        let order_map = build_order_map(order.as_ref());
+        let actual = sort_derive_traits(&derives, &order_map, true);
         let expected = vec![
             // head
             dt("B", "B"),
