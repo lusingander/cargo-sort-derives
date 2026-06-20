@@ -1,21 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
-    sync::mpsc::{self, Sender},
+    sync::mpsc,
 };
 
-use grep_regex::RegexMatcherBuilder;
-use grep_searcher::{Searcher, SearcherBuilder, Sink, SinkMatch};
 use ignore::{WalkBuilder, WalkParallel, overrides::OverrideBuilder, types::TypesBuilder};
 
-const PATTERN: &str = r"#\[(?:derive\([^\)]+\)|cfg_attr\(.+,\s*derive\([^\)]+\)\))";
-
-pub type Matches = Vec<(PathBuf, HashSet<usize>)>;
-
-struct Match {
-    file_path: PathBuf,
-    line_number: usize,
-}
+pub type Matches = Vec<(PathBuf, Vec<crate::parse::DeriveAttr>)>;
 
 pub fn grep<P: AsRef<Path>>(path: Option<P>, exclude: Vec<String>) -> Result<Matches, String> {
     match path {
@@ -69,7 +60,7 @@ fn exec_grep(walker: WalkParallel) -> Result<Matches, String> {
             Ok(entry) => {
                 if let Some(file_type) = entry.file_type() {
                     if file_type.is_file() {
-                        grep_file(entry.into_path(), &tx);
+                        tx.send(Ok(entry.into_path())).unwrap();
                     }
                 }
                 ignore::WalkState::Continue
@@ -83,52 +74,51 @@ fn exec_grep(walker: WalkParallel) -> Result<Matches, String> {
 
     drop(tx);
 
-    let matches: Result<Vec<Match>, String> = rx.into_iter().collect();
+    let paths: Result<Vec<PathBuf>, String> = rx.into_iter().collect();
+    let paths = paths?;
 
-    matches
-        .map(|ms| {
-            ms.into_iter()
-                .fold(HashMap::<PathBuf, HashSet<usize>>::new(), |mut acc, m| {
-                    acc.entry(m.file_path).or_default().insert(m.line_number);
-                    acc
-                })
-        })
-        .map(|m| {
-            let mut vec: Vec<(PathBuf, HashSet<usize>)> = m.into_iter().collect();
-            vec.sort_by(|(a, _), (b, _)| a.cmp(b));
-            vec
-        })
-}
-
-struct SearchSink<'a> {
-    tx: &'a Sender<Result<Match, String>>,
-    file_path: &'a Path,
-}
-
-impl Sink for SearchSink<'_> {
-    type Error = std::io::Error;
-
-    fn matched(&mut self, _searcher: &Searcher, mat: &SinkMatch<'_>) -> Result<bool, Self::Error> {
-        let m = Match {
-            file_path: self.file_path.to_owned(),
-            line_number: mat.line_number().unwrap() as usize,
-        };
-        self.tx.send(Ok(m)).unwrap();
-        Ok(true)
+    let mut results: Matches = Vec::new();
+    for path in paths {
+        let content =
+            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let disabled_lines = compute_disabled_lines(&content);
+        let attrs = crate::parse::collect_derive_attrs(&content, &disabled_lines)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        if !attrs.is_empty() {
+            results.push((path, attrs));
+        }
     }
+
+    results.sort_by(|(a, _), (b, _)| a.cmp(b));
+    Ok(results)
 }
 
-fn grep_file(path: PathBuf, tx: &Sender<Result<Match, String>>) {
-    let matcher = RegexMatcherBuilder::new().build(PATTERN).unwrap();
+fn compute_disabled_lines(source: &str) -> HashSet<usize> {
+    let mut disabled = HashSet::new();
+    let mut disable_next_line = false;
+    let mut disable_range = false;
 
-    let mut searcher = SearcherBuilder::new().line_number(true).build();
-    let sink = SearchSink {
-        tx,
-        file_path: &path,
-    };
-    if let Err(err) = searcher.search_path(&matcher, &path, sink) {
-        tx.send(Err(err.to_string())).unwrap();
+    for (i, line) in source.lines().enumerate() {
+        let n = i + 1;
+
+        if disable_next_line || disable_range {
+            disabled.insert(n);
+        }
+
+        disable_next_line = false;
+
+        if line.contains("sort-derives-disable-next-line") {
+            disable_next_line = true;
+        }
+        if line.contains("sort-derives-disable-start") {
+            disable_range = true;
+        }
+        if line.contains("sort-derives-disable-end") {
+            disable_range = false;
+        }
     }
+
+    disabled
 }
 
 #[cfg(test)]
@@ -151,11 +141,15 @@ mod tests {
         let exclude = vec![];
 
         let tmp_root_dir = setup_tmp_files(files);
-        let expected = expected_matches(tmp_root_dir.path(), files);
+        let expected = expected_paths(tmp_root_dir.path(), files);
 
         let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
-
-        assert_eq!(actual, expected);
+        let actual_paths: Vec<&PathBuf> = actual.iter().map(|(p, _)| p).collect();
+        assert_eq!(actual_paths, expected.iter().collect::<Vec<_>>());
+        for (_, attrs) in &actual {
+            assert!(!attrs.is_empty());
+            assert_eq!(attrs.len(), 4, "rs_file_1 should yield 4 derive attrs");
+        }
     }
 
     #[test]
@@ -180,11 +174,15 @@ mod tests {
         ];
 
         let tmp_root_dir = setup_tmp_files(files);
-        let expected = expected_matches(tmp_root_dir.path(), files);
+        let expected = expected_paths(tmp_root_dir.path(), files);
 
         let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
-
-        assert_eq!(actual, expected);
+        let actual_paths: Vec<&PathBuf> = actual.iter().map(|(p, _)| p).collect();
+        assert_eq!(actual_paths, expected.iter().collect::<Vec<_>>());
+        for (_, attrs) in &actual {
+            assert!(!attrs.is_empty());
+            assert_eq!(attrs.len(), 4, "rs_file_1 should yield 4 derive attrs");
+        }
     }
 
     #[test]
@@ -203,11 +201,15 @@ mod tests {
 
         setup_ignore_file(&tmp_root_dir, ".ignore", vec!["b.rs", "x/y/*"]);
 
-        let expected = expected_matches(tmp_root_dir.path(), files);
+        let expected = expected_paths(tmp_root_dir.path(), files);
 
         let actual = grep_all_files(tmp_root_dir.path(), exclude).unwrap();
-
-        assert_eq!(actual, expected);
+        let actual_paths: Vec<&PathBuf> = actual.iter().map(|(p, _)| p).collect();
+        assert_eq!(actual_paths, expected.iter().collect::<Vec<_>>());
+        for (_, attrs) in &actual {
+            assert!(!attrs.is_empty());
+            assert_eq!(attrs.len(), 4, "rs_file_1 should yield 4 derive attrs");
+        }
     }
 
     #[test]
@@ -223,11 +225,15 @@ mod tests {
 
         let tmp_root_dir = setup_tmp_files(files);
 
-        let expected = expected_matches(tmp_root_dir.path(), files);
+        let expected = expected_paths(tmp_root_dir.path(), files);
 
         let actual = grep_single_file(tmp_root_dir.child("x/xa.rs")).unwrap();
-
-        assert_eq!(actual, expected);
+        let actual_paths: Vec<&PathBuf> = actual.iter().map(|(p, _)| p).collect();
+        assert_eq!(actual_paths, expected.iter().collect::<Vec<_>>());
+        for (_, attrs) in &actual {
+            assert!(!attrs.is_empty());
+            assert_eq!(attrs.len(), 4, "rs_file_1 should yield 4 derive attrs");
+        }
     }
 
     #[test]
@@ -245,11 +251,15 @@ mod tests {
 
         setup_ignore_file(&tmp_root_dir, ".ignore", vec!["x/xa.rs"]);
 
-        let expected = expected_matches(tmp_root_dir.path(), files);
+        let expected = expected_paths(tmp_root_dir.path(), files);
 
         let actual = grep_single_file(tmp_root_dir.child("x/xa.rs")).unwrap();
-
-        assert_eq!(actual, expected);
+        let actual_paths: Vec<&PathBuf> = actual.iter().map(|(p, _)| p).collect();
+        assert_eq!(actual_paths, expected.iter().collect::<Vec<_>>());
+        for (_, attrs) in &actual {
+            assert!(!attrs.is_empty());
+            assert_eq!(attrs.len(), 4, "rs_file_1 should yield 4 derive attrs");
+        }
     }
 
     #[test]
@@ -284,47 +294,40 @@ mod tests {
         assert!(actual.is_err());
     }
 
-    fn rs_file_1() -> (&'static str, HashSet<usize>) {
-        let source = r#"
-        #[derive(Debug)]
-        struct A;
+    fn rs_file_1() -> &'static str {
+        "#[derive(Debug)]
+struct A;
 
-        #[derive(Clone, Copy)]
-        struct B;
-        
-        #[cfg_attr(feature = "extra", derive(PartialEq, Eq))]
-        struct C;
-        
-        #[cfg_attr(all(feature = "serde", not(test)), derive(Deserialize, Serialize))]
-        struct D;
-        "#;
-        let derive_lines = HashSet::from([2, 5, 8, 11]);
-        (source, derive_lines)
+#[derive(Clone, Copy)]
+struct B;
+
+#[cfg_attr(feature = \"extra\", derive(PartialEq, Eq))]
+struct C;
+
+#[cfg_attr(all(feature = \"serde\", not(test)), derive(Deserialize, Serialize))]
+struct D;
+"
     }
 
-    fn rs_file_2() -> (&'static str, HashSet<usize>) {
-        let source = r#"
-        struct A;
-        "#;
-        let derive_lines = HashSet::from([]);
-        (source, derive_lines)
+    fn rs_file_2() -> &'static str {
+        "struct A;\n"
     }
 
-    type Files<'a> = &'a [(&'a str, (&'a str, HashSet<usize>), bool)];
+    type Files<'a> = &'a [(&'a str, &'a str, bool)];
 
     fn setup_tmp_files(files: Files) -> assert_fs::TempDir {
         let tmp_root_dir = assert_fs::TempDir::new().unwrap();
-        for (path, (content, _), _) in files.iter() {
-            tmp_root_dir.child(path).write_str(content).unwrap();
+        for (path, content, _) in files.iter() {
+            tmp_root_dir.child(path).write_str(*content).unwrap();
         }
         tmp_root_dir
     }
 
-    fn expected_matches(tmp_root_path: &Path, files: Files) -> Matches {
+    fn expected_paths(tmp_root_path: &Path, files: Files) -> Vec<PathBuf> {
         files
             .iter()
-            .filter(|(_, (_, _), is_match)| *is_match)
-            .map(|(p, (_, ls), _)| (tmp_root_path.join(p), ls.iter().copied().collect()))
+            .filter(|(_, _, is_match)| *is_match)
+            .map(|(p, _, _)| tmp_root_path.join(p))
             .collect()
     }
 
