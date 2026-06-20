@@ -97,7 +97,7 @@ fn read_exclude(config: &Config) -> Vec<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli::SortDerives(args) = Cli::parse();
-    let config = Config::load(&args.config);
+    let config = Config::load(args.config.as_ref())?;
 
     let custom_order = read_custom_order(&config, &args)?;
     let preserve = read_preserve(&config, &args);
