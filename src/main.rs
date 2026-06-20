@@ -5,7 +5,10 @@ mod process;
 mod sort;
 mod util;
 
-use std::{io::Read, path::Path};
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use clap::{Args, Parser, ValueEnum};
 
@@ -13,7 +16,7 @@ use crate::{
     config::Config,
     grep::grep,
     process::process,
-    sort::{sort, sort_stdin},
+    sort::{build_order_map, sort, sort_stdin},
     util::parse_order,
 };
 
@@ -107,11 +110,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = args.stdin;
     let output_color = args.color.into();
 
+    let order_map = build_order_map(custom_order.as_ref());
+
     if stdin {
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input)?;
         // stdin input is already the whole target, so file discovery via grep is not needed.
-        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
+        let (old_lines, new_lines) = sort_stdin(&input, &order_map, preserve)?;
 
         if check {
             if !process(
@@ -131,9 +136,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut no_diff = true;
+    // Pass 1: read-only — collect all (file_path, old_lines, new_lines) tuples
+    let mut results: Vec<(PathBuf, Vec<String>, Vec<String>)> = Vec::new();
     for (file_path, line_numbers) in grep(path, exclude)? {
-        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
+        let (old_lines, new_lines) = sort(&file_path, line_numbers, &order_map, preserve)?;
+        results.push((file_path, old_lines, new_lines));
+    }
+
+    // Pass 2: write/check
+    let mut no_diff = true;
+    for (file_path, old_lines, new_lines) in results {
         no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
     }
 
