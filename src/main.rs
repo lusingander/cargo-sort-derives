@@ -1,6 +1,7 @@
 mod config;
-mod ext;
+mod console;
 mod grep;
+mod parse;
 mod process;
 mod sort;
 mod util;
@@ -11,9 +12,10 @@ use clap::{Args, Parser, ValueEnum};
 
 use crate::{
     config::Config,
+    console::{Console, OutputColor},
     grep::grep,
     process::process,
-    sort::{sort, sort_stdin},
+    sort::{derive_line_numbers, sort_source, sort_stdin},
     util::parse_order,
 };
 
@@ -55,6 +57,10 @@ struct SortDerivesArgs {
     /// The path to the config file
     #[clap(long, value_name = "FILE")]
     config: Option<String>,
+
+    /// Suppress output to stderr
+    #[clap(short, long)]
+    quiet: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -64,12 +70,12 @@ enum Color {
     Never,
 }
 
-impl From<Color> for process::OutputColor {
+impl From<Color> for OutputColor {
     fn from(color: Color) -> Self {
         match color {
-            Color::Auto => process::OutputColor::Auto,
-            Color::Always => process::OutputColor::Always,
-            Color::Never => process::OutputColor::Never,
+            Color::Auto => OutputColor::Auto,
+            Color::Always => OutputColor::Always,
+            Color::Never => OutputColor::Never,
         }
     }
 }
@@ -105,37 +111,94 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = args.path;
     let check = args.check;
     let stdin = args.stdin;
+    let quiet = args.quiet;
     let output_color = args.color.into();
+
+    let output_color = if std::env::var_os("NO_COLOR").is_some() {
+        OutputColor::Never
+    } else {
+        output_color
+    };
+
+    let console = Console::new(quiet, output_color);
+    console.print_config(&custom_order, preserve, &exclude);
+
+    let mut total = 0usize;
+    let mut changed_count = 0usize;
+    let mut unchanged_count = 0usize;
 
     if stdin {
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input)?;
-        // stdin input is already the whole target, so file discovery via grep is not needed.
-        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
+        let (old_lines, new_lines, attrs, per_attr_changed) =
+            sort_stdin(&input, &custom_order, preserve)?;
+        let derive_lines = derive_line_numbers(&input, &attrs);
+
+        total = attrs.len();
+        for &changed in &per_attr_changed {
+            if changed {
+                changed_count += 1;
+            } else {
+                unchanged_count += 1;
+            }
+        }
+
+        let no_diff = process(
+            Path::new("<stdin>"),
+            old_lines,
+            new_lines.clone(),
+            check,
+            &derive_lines,
+            &mut |dc| console.on_derive(&dc),
+        )?;
 
         if check {
-            if !process(
-                // process only uses this path when rendering check diffs.
-                Path::new("<stdin>"),
-                old_lines,
-                new_lines,
-                true,
-                output_color,
-            )? {
+            if !no_diff {
+                console.print_check_diff(Path::new("<stdin>"), &input, &new_lines);
                 std::process::exit(1);
             }
         } else {
-            print!("{}", new_lines.concat());
+            print!("{}", new_lines);
         }
 
+        console.print_summary(changed_count, unchanged_count, total);
         return Ok(());
     }
 
     let mut no_diff = true;
-    for (file_path, line_numbers) in grep(path, exclude)? {
-        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
-        no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
+    for (file_path, attrs) in grep(path, exclude)? {
+        let content = std::fs::read_to_string(&file_path)
+            .map_err(|e| format!("{}: {}", file_path.display(), e))?;
+        let derive_lines = derive_line_numbers(&content, &attrs);
+        let (old_lines, new_lines, per_attr_changed) =
+            sort_source(content, &attrs, &custom_order, preserve);
+
+        total += attrs.len();
+        for &changed in &per_attr_changed {
+            if changed {
+                changed_count += 1;
+            } else {
+                unchanged_count += 1;
+            }
+        }
+
+        let file_no_diff = process(
+            &file_path,
+            old_lines.clone(),
+            new_lines.clone(),
+            check,
+            &derive_lines,
+            &mut |dc| console.on_derive(&dc),
+        )?;
+
+        if check && !file_no_diff {
+            console.print_check_diff(&file_path, &old_lines, &new_lines);
+        }
+
+        no_diff &= file_no_diff;
     }
+
+    console.print_summary(changed_count, unchanged_count, total);
 
     if !no_diff {
         std::process::exit(1);

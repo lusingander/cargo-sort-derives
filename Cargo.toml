@@ -17,11 +17,9 @@ exclude = ["/.github", "/img", "_config.yml", "tests", "fixtures"]
 [dependencies]
 clap = { version = "4.6.1", features = ["derive"] }
 console = "0.16.3"
-grep-matcher = "0.1.8"
-grep-regex = "0.1.14"
-grep-searcher = "0.1.16"
 ignore = "0.4.26"
-regex = "1.12.4"
+proc-macro2 = { version = "1", features = ["span-locations"] }
+syn = { version = "2", features = ["full", "parsing"] }
 serde = { version = "1.0.228", features = ["derive"] }
 similar = "3.1.1"
 toml = "1.1.2"

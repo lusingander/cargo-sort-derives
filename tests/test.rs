@@ -93,6 +93,29 @@ fn test_stdin_check() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_multiline() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("multiline.rs"))?;
+    let expected =
+        std::fs::read_to_string(Path::new(EXPECTED_BASE_DIR).join("default/multiline.rs"))?;
+
+    std::fs::write(dir.path().join("multiline.rs"), &input)?;
+
+    cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .arg("--path")
+        .arg(dir.path().join("multiline.rs"))
+        .current_dir(dir.path())
+        .assert()
+        .success();
+
+    let actual = std::fs::read_to_string(dir.path().join("multiline.rs"))?;
+
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
 fn setup_input() -> Result<TempDir> {
     let temp_dir = tempfile::tempdir()?;
     let temp_dir_path = temp_dir.path();

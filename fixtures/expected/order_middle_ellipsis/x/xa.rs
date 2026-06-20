@@ -11,7 +11,7 @@ struct Xa2 {
 }
 
 // mod xa3 {
-//     #[derive(Eq, Clone, Copy, PartialEq)]
+//     #[derive(Clone, Copy, PartialEq, Eq)]
 //     pub struct Xa3 {
 //         f: f32,
 //     }
