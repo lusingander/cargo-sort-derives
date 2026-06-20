@@ -126,9 +126,11 @@ dependencies = [
  "grep-regex",
  "grep-searcher",
  "ignore",
+ "proc-macro2",
  "regex",
  "serde",
  "similar",
+ "syn",
  "tempfile",
  "toml",
 ]

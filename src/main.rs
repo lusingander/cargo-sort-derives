@@ -1,5 +1,6 @@
 mod config;
 mod ext;
+mod parse;
 mod grep;
 mod process;
 mod sort;
