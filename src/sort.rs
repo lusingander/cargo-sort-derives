@@ -21,12 +21,16 @@ const DISABLE_END: &str = "sort-derives-disable-end";
 
 pub fn sort(
     file_path: &Path,
-    line_numbers: HashSet<usize>,
+    attrs: &[crate::parse::DeriveAttr],
     custom_order: &Option<Vec<String>>,
     preserve: bool,
 ) -> Result<(Vec<String>, Vec<String>), std::io::Error> {
-    let file = std::fs::File::open(file_path)?;
-    let reader = std::io::BufReader::new(file);
+    let content = std::fs::read_to_string(file_path)?;
+    let line_numbers: HashSet<usize> = attrs
+        .iter()
+        .map(|a| content[..a.start].chars().filter(|&c| c == '\n').count() + 1)
+        .collect();
+    let reader = std::io::Cursor::new(content.as_str());
     sort_reader(reader, Some(&line_numbers), custom_order, preserve)
 }
 

@@ -1,7 +1,7 @@
 mod config;
 mod ext;
-mod parse;
 mod grep;
+mod parse;
 mod process;
 mod sort;
 mod util;
@@ -133,8 +133,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut no_diff = true;
-    for (file_path, line_numbers) in grep(path, exclude)? {
-        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
+    for (file_path, attrs) in grep(path, exclude)? {
+        let (old_lines, new_lines) = sort(&file_path, &attrs, &custom_order, preserve)?;
         no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
     }
 
