@@ -47,6 +47,10 @@ fn grep_all_files<P: AsRef<Path>>(root: P, exclude: Vec<String>) -> Result<Match
 fn grep_single_file<P: AsRef<Path>>(path: P) -> Result<Matches, String> {
     let path = path.as_ref();
 
+    if !path.exists() {
+        return Err(format!("{}: No such file", path.display()));
+    }
+
     if path.is_dir() {
         return Err(format!("{} is a directory", path.display()));
     }

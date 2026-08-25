@@ -76,7 +76,7 @@ fn calc_diff_lines(
                 let (line, style) = match change.tag() {
                     ChangeTag::Delete => (format!("- {}", change.value()), del_style.clone()),
                     ChangeTag::Insert => (format!("+ {}", change.value()), ins_style.clone()),
-                    ChangeTag::Equal => unreachable!(),
+                    ChangeTag::Equal => continue,
                 };
                 lines.push(format!("{}", style.apply_to(line)));
             }

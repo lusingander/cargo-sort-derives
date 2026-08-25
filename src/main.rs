@@ -5,7 +5,10 @@ mod process;
 mod sort;
 mod util;
 
-use std::{io::Read, path::Path};
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use clap::{Args, Parser, ValueEnum};
 
@@ -13,7 +16,7 @@ use crate::{
     config::Config,
     grep::grep,
     process::process,
-    sort::{sort, sort_stdin},
+    sort::{build_order_map, sort, sort_stdin},
     util::parse_order,
 };
 
@@ -74,11 +77,15 @@ impl From<Color> for process::OutputColor {
     }
 }
 
-fn read_custom_order<'a>(
-    config: &'a Config,
-    args: &'a SortDerivesArgs,
+fn read_custom_order(
+    config: &Config,
+    args: &SortDerivesArgs,
 ) -> Result<Option<Vec<String>>, String> {
-    let order = args.order.clone().map(parse_order).or(config.order.clone());
+    let order = args
+        .order
+        .as_deref()
+        .map(parse_order)
+        .or(config.order.clone());
     if let Some(order) = &order {
         if order.iter().filter(|s| *s == "...").count() > 1 {
             return Err("Only one '...' is allowed in the custom order".to_string());
@@ -97,7 +104,7 @@ fn read_exclude(config: &Config) -> Vec<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let Cli::SortDerives(args) = Cli::parse();
-    let config = Config::load(&args.config);
+    let config = Config::load(args.config.as_ref())?;
 
     let custom_order = read_custom_order(&config, &args)?;
     let preserve = read_preserve(&config, &args);
@@ -107,11 +114,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdin = args.stdin;
     let output_color = args.color.into();
 
+    let order_map = build_order_map(custom_order.as_ref());
+
     if stdin {
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input)?;
         // stdin input is already the whole target, so file discovery via grep is not needed.
-        let (old_lines, new_lines) = sort_stdin(&input, &custom_order, preserve)?;
+        let (old_lines, new_lines) = sort_stdin(&input, &order_map, preserve)?;
 
         if check {
             if !process(
@@ -131,9 +140,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut no_diff = true;
+    // Pass 1: read-only — collect all (file_path, old_lines, new_lines) tuples
+    let mut results: Vec<(PathBuf, Vec<String>, Vec<String>)> = Vec::new();
     for (file_path, line_numbers) in grep(path, exclude)? {
-        let (old_lines, new_lines) = sort(&file_path, line_numbers, &custom_order, preserve)?;
+        let (old_lines, new_lines) = sort(&file_path, line_numbers, &order_map, preserve)?;
+        results.push((file_path, old_lines, new_lines));
+    }
+
+    // Pass 2: write/check
+    let mut no_diff = true;
+    for (file_path, old_lines, new_lines) in results {
         no_diff &= process(&file_path, old_lines, new_lines, check, output_color)?;
     }
 
