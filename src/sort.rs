@@ -107,7 +107,7 @@ fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(|s| {
-                let base_name = s.split(':').next_back().unwrap_or(s);
+                let base_name = s.split(':').next_back().unwrap_or(s).trim();
                 DeriveTrait {
                     s: s.into(),
                     base_name: base_name.into(),
@@ -200,6 +200,27 @@ mod tests {
             dt("foo::bar::Bar", "Bar"),
         ];
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_derive_traits_with_whitespace_in_paths() {
+        for path in [
+            "serde :: Serialize",
+            "serde:: Serialize",
+            "serde ::Serialize",
+            "serde::\tSerialize",
+            "::serde :: Serialize",
+            "foo :: bar :: Serialize",
+        ] {
+            for line in [
+                format!("#[derive(Debug, {path})]"),
+                format!("#[cfg_attr(feature = \"serde\", derive(Debug, {path}))]"),
+            ] {
+                let actual = parse_derive_traits(&line).unwrap();
+                let expected = vec![dt("Debug", "Debug"), dt(path, "Serialize")];
+                assert_eq!(actual, expected, "{line}");
+            }
+        }
     }
 
     #[test]
