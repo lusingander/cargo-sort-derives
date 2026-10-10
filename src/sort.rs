@@ -203,6 +203,27 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_derive_traits_with_whitespace_in_paths() {
+        for path in [
+            "serde :: Serialize",
+            "serde:: Serialize",
+            "serde ::Serialize",
+            "serde::\tSerialize",
+            "::serde :: Serialize",
+            "foo :: bar :: Serialize",
+        ] {
+            for line in [
+                format!("#[derive(Debug, {path})]"),
+                format!("#[cfg_attr(feature = \"serde\", derive(Debug, {path}))]"),
+            ] {
+                let actual = parse_derive_traits(&line).unwrap();
+                let expected = vec![dt("Debug", "Debug"), dt(path, "Serialize")];
+                assert_eq!(actual, expected, "{line}");
+            }
+        }
+    }
+
+    #[test]
     fn test_parse_derive_traits_with_cfg_attr() {
         let line = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]";
         let actual = parse_derive_traits(line).unwrap();
