@@ -107,7 +107,7 @@ fn parse_derive_traits(line: &str) -> Option<Vec<DeriveTrait>> {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(|s| {
-                let base_name = s.split(':').next_back().unwrap_or(s);
+                let base_name = s.split(':').next_back().unwrap_or(s).trim();
                 DeriveTrait {
                     s: s.into(),
                     base_name: base_name.into(),
