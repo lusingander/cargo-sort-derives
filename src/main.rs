@@ -79,10 +79,10 @@ fn read_custom_order<'a>(
     args: &'a SortDerivesArgs,
 ) -> Result<Option<Vec<String>>, String> {
     let order = args.order.clone().map(parse_order).or(config.order.clone());
-    if let Some(order) = &order {
-        if order.iter().filter(|s| *s == "...").count() > 1 {
-            return Err("Only one '...' is allowed in the custom order".to_string());
-        }
+    if let Some(order) = &order
+        && order.iter().filter(|s| *s == "...").count() > 1
+    {
+        return Err("Only one '...' is allowed in the custom order".to_string());
     }
     Ok(order)
 }

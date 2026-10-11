@@ -67,10 +67,10 @@ fn exec_grep(walker: WalkParallel) -> Result<Matches, String> {
         let tx = tx.clone();
         Box::new(move |result| match result {
             Ok(entry) => {
-                if let Some(file_type) = entry.file_type() {
-                    if file_type.is_file() {
-                        grep_file(entry.into_path(), &tx);
-                    }
+                if let Some(file_type) = entry.file_type()
+                    && file_type.is_file()
+                {
+                    grep_file(entry.into_path(), &tx);
                 }
                 ignore::WalkState::Continue
             }
