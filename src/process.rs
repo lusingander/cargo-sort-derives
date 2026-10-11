@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use console::Style;
-use similar::{ChangeTag, TextDiff};
+use similar::{Algorithm, ChangeTag, TextDiff};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputColor {
@@ -50,7 +50,10 @@ fn calc_diff_lines(
 ) -> Vec<String> {
     let old = old_lines.concat();
     let new = new_lines.concat();
-    let diff = TextDiff::from_lines(&old, &new);
+    // Preserve the shortest-edit-script behavior used before similar 3.2.
+    let diff = TextDiff::configure()
+        .algorithm(Algorithm::RawMyers)
+        .diff_lines(&old, &new);
 
     if diff.ratio() == 1.0 {
         // no changes

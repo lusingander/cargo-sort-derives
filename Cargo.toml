@@ -15,19 +15,19 @@ rust-version = "1.88.0"
 exclude = ["/.github", "/img", "_config.yml", "tests", "fixtures"]
 
 [dependencies]
-clap = { version = "4.6.1", features = ["derive"] }
-console = "0.16.4"
-grep-matcher = "0.1.8"
+clap = { version = "4.6.7", features = ["derive"] }
+console = "0.16.6"
+grep-matcher = "0.1.9"
 grep-regex = "0.1.14"
-grep-searcher = "0.1.16"
-ignore = "0.4.28"
-regex = "1.13.0"
-serde = { version = "1.0.228", features = ["derive"] }
-similar = "3.1.1"
-toml = "1.1.2"
+grep-searcher = "0.1.17"
+ignore = "0.4.33"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+similar = "3.2.0"
+toml = "1.1.8"
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
 assert_fs = "1.1.4"
-dircpy = "0.3.20"
+dircpy = "0.3.21"
 tempfile = "3.27.0"
