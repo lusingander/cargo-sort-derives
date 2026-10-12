@@ -5,7 +5,7 @@ use std::{
     sync::LazyLock,
 };
 
-use regex::Regex;
+use regex::{NoExpand, Regex};
 
 use crate::ext::BufReadExt;
 
@@ -169,13 +169,13 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
 
     if let Some(_caps) = DERIVE_RE.captures(line) {
         let replacement = format!("#[derive({sorted_derive_str})]");
-        return DERIVE_RE.replace(line, replacement).into();
+        return DERIVE_RE.replace(line, NoExpand(&replacement)).into();
     }
 
     if let Some(caps) = CFG_ATTR_RE.captures(line) {
         let condition = caps.get(1).unwrap().as_str();
         let replacement = format!("#[cfg_attr({condition}, derive({sorted_derive_str}))]");
-        return CFG_ATTR_RE.replace(line, replacement).into();
+        return CFG_ATTR_RE.replace(line, NoExpand(&replacement)).into();
     }
 
     line.to_string()
