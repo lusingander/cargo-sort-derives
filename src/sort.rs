@@ -5,7 +5,7 @@ use std::{
     sync::LazyLock,
 };
 
-use regex::Regex;
+use regex::{NoExpand, Regex};
 
 use crate::ext::BufReadExt;
 
@@ -169,13 +169,13 @@ fn replace_line(line: &str, sorted_derives: &[DeriveTrait]) -> String {
 
     if let Some(_caps) = DERIVE_RE.captures(line) {
         let replacement = format!("#[derive({sorted_derive_str})]");
-        return DERIVE_RE.replace(line, replacement).into();
+        return DERIVE_RE.replace(line, NoExpand(&replacement)).into();
     }
 
     if let Some(caps) = CFG_ATTR_RE.captures(line) {
         let condition = caps.get(1).unwrap().as_str();
         let replacement = format!("#[cfg_attr({condition}, derive({sorted_derive_str}))]");
-        return CFG_ATTR_RE.replace(line, replacement).into();
+        return CFG_ATTR_RE.replace(line, NoExpand(&replacement)).into();
     }
 
     line.to_string()
@@ -499,6 +499,33 @@ mod tests {
             dt("A", "A"),
         ];
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_sort_stdin_preserves_dollar_crate_in_derive() {
+        let input = "#[derive($crate::__reexports::serde::Deserialize, Debug, $crate::__reexports::candid::CandidType)]\n";
+        let expected = "#[derive($crate::__reexports::candid::CandidType, Debug, $crate::__reexports::serde::Deserialize)]\n";
+
+        for source in [input, expected] {
+            let (_, new_lines) = sort_stdin(source, &None, false).unwrap();
+            assert_eq!(new_lines.concat(), expected);
+        }
+    }
+
+    #[test]
+    fn test_sort_stdin_preserves_dollar_crate_in_cfg_attr() {
+        let input = "#[cfg_attr(feature = \"wire\", derive($crate::__reexports::serde::Serialize, Debug, $crate::__reexports::serde::Deserialize))]\n";
+        let expected = "#[cfg_attr(feature = \"wire\", derive(Debug, $crate::__reexports::serde::Deserialize, $crate::__reexports::serde::Serialize))]\n";
+
+        for source in [input, expected] {
+            let (_, new_lines) = sort_stdin(source, &None, false).unwrap();
+            assert_eq!(new_lines.concat(), expected);
+        }
+
+        let single_derive =
+            "#[cfg_attr(feature = \"wire\", derive($crate::__reexports::serde::Serialize))]\n";
+        let (_, new_lines) = sort_stdin(single_derive, &None, false).unwrap();
+        assert_eq!(new_lines.concat(), single_derive);
     }
 
     #[test]
