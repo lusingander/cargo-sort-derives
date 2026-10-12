@@ -502,6 +502,33 @@ mod tests {
     }
 
     #[test]
+    fn test_sort_stdin_preserves_dollar_crate_in_derive() {
+        let input = "#[derive($crate::__reexports::serde::Deserialize, Debug, $crate::__reexports::candid::CandidType)]\n";
+        let expected = "#[derive($crate::__reexports::candid::CandidType, Debug, $crate::__reexports::serde::Deserialize)]\n";
+
+        for source in [input, expected] {
+            let (_, new_lines) = sort_stdin(source, &None, false).unwrap();
+            assert_eq!(new_lines.concat(), expected);
+        }
+    }
+
+    #[test]
+    fn test_sort_stdin_preserves_dollar_crate_in_cfg_attr() {
+        let input = "#[cfg_attr(feature = \"wire\", derive($crate::__reexports::serde::Serialize, Debug, $crate::__reexports::serde::Deserialize))]\n";
+        let expected = "#[cfg_attr(feature = \"wire\", derive(Debug, $crate::__reexports::serde::Deserialize, $crate::__reexports::serde::Serialize))]\n";
+
+        for source in [input, expected] {
+            let (_, new_lines) = sort_stdin(source, &None, false).unwrap();
+            assert_eq!(new_lines.concat(), expected);
+        }
+
+        let single_derive =
+            "#[cfg_attr(feature = \"wire\", derive($crate::__reexports::serde::Serialize))]\n";
+        let (_, new_lines) = sort_stdin(single_derive, &None, false).unwrap();
+        assert_eq!(new_lines.concat(), single_derive);
+    }
+
+    #[test]
     fn test_replace_line_with_cfg_attr() {
         let line = "#[cfg_attr(feature = \"serde\", derive(Serialize, Deserialize))]";
         let sorted_derives = vec![
