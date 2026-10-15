@@ -47,7 +47,13 @@ impl From<OrderType> for Vec<String> {
 }
 
 impl Config {
-    pub fn load(config_file_path: &Option<String>) -> Config {
+    pub fn load(config_file_path: &Option<String>) -> Result<Config, String> {
+        if let Some(path) = config_file_path
+            && !PathBuf::from(path).exists()
+        {
+            return Err(format!("Config file does not exist: {path}"));
+        }
+
         let paths = config_file_path
             .as_ref()
             .map(|p| vec![PathBuf::from(p)])
@@ -58,7 +64,7 @@ impl Config {
                     .map(|p| base_dir_path.join(p))
                     .collect()
             });
-        load_from(paths)
+        Ok(load_from(paths))
     }
 }
 
