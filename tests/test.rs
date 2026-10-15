@@ -55,6 +55,28 @@ fn test_exclude() -> Result<()> {
 }
 
 #[test]
+fn test_missing_explicit_config() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let source_path = dir.path().join("lib.rs");
+    let source = "#[derive(Debug, Clone)]\nstruct Example;\n";
+    std::fs::write(&source_path, source)?;
+    std::fs::write(dir.path().join(".sort-derives.toml"), "preserve = true\n")?;
+
+    let assert = cargo_bin_cmd!()
+        .arg(BASE_COMMAND_NAME)
+        .args(["--config", "missing.toml"])
+        .current_dir(dir.path())
+        .assert()
+        .failure()
+        .code(1);
+
+    let stderr = String::from_utf8(assert.get_output().stderr.clone())?;
+    assert!(stderr.contains("Config file does not exist: missing.toml"));
+    assert_eq!(std::fs::read_to_string(source_path)?, source);
+    Ok(())
+}
+
+#[test]
 fn test_stdin() -> Result<()> {
     let dir = tempfile::tempdir()?;
     let input = std::fs::read_to_string(Path::new(INPUT_DIR).join("a.rs"))?;
