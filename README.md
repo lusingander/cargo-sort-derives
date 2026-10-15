@@ -180,6 +180,7 @@ You can exclude parts of your code from being sorted by including certain string
 If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, the config will be loaded.
 
 You can also specify a configuration file with the `--config` option. In this case, the specified file will be read with priority.
+If the specified file does not exist, the command exits with an error.
 
 #### Format
 
