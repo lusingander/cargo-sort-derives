@@ -20,11 +20,11 @@ console = "0.16.6"
 grep-matcher = "0.1.9"
 grep-regex = "0.1.14"
 grep-searcher = "0.1.17"
-ignore = "0.4.33"
+ignore = "0.4.34"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
-similar = "3.2.0"
-toml = "1.1.8"
+similar = "3.2.1"
+toml = "1.2.1"
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
