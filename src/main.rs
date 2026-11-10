@@ -59,7 +59,7 @@ struct SortDerivesArgs {
     #[clap(long, value_name = "FILE")]
     config: Option<String>,
 
-    /// Do not load the user-global config at ~/.config/cargo-sort-derives.toml
+    /// Skip loading the user-global config
     #[clap(long)]
     no_user_config: bool,
 }

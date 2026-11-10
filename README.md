@@ -22,17 +22,18 @@ $ cargo install --locked cargo-sort-derives
 Usage: cargo sort-derives [OPTIONS]
 
 Options:
-  -p, --path <FILE>    The path to the file to sort
-                       If not specified, all .rs files in the current directory will be sorted
-      --order <VALUE>  Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
-                       Any derives not listed will appear at the end in alphabetical order by default
-      --preserve       Preserve the original order for unspecified derive attributes (only applies when --order is used)
-      --check          Check if the derive attributes are sorted
-      --stdin          Read Rust source from stdin and write formatted source to stdout
-      --color <TYPE>   Use colored output [default: auto] [possible values: auto, always, never]
-      --config <FILE>  The path to the config file
-  -h, --help           Print help
-  -V, --version        Print version
+  -p, --path <FILE>     The path to the file to sort
+                        If not specified, all .rs files in the current directory will be sorted
+      --order <VALUE>   Define the custom order of derive attributes, separated by commas (e.g. "Debug, Clone, Copy")
+                        Any derives not listed will appear at the end in alphabetical order by default
+      --preserve        Preserve the original order for unspecified derive attributes (only applies when --order is used)
+      --check           Check if the derive attributes are sorted
+      --stdin           Read Rust source from stdin and write formatted source to stdout
+      --color <TYPE>    Use colored output [default: auto] [possible values: auto, always, never]
+      --config <FILE>   The path to the config file
+      --no-user-config  Skip loading the user-global config
+  -h, --help            Print help
+  -V, --version         Print version
 ```
 
 ### Basic
@@ -177,14 +178,18 @@ You can exclude parts of your code from being sorted by including certain string
 
 ### Config
 
-If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, the config will be loaded.
+If `.sort-derives.toml` or `sort-derives.toml` exists in the current directory, it is loaded as the project config.
 
-You can also specify a configuration file with the `--config` option. In this case, the specified file will be read with priority.
+Use `--config <FILE>` to select the project config explicitly.
 If the specified file does not exist, the command exits with an error.
+
+The user-global config is loaded from `$XDG_CONFIG_HOME/cargo-sort-derives.toml` when `XDG_CONFIG_HOME` is set and non-empty, or from `~/.config/cargo-sort-derives.toml` otherwise.
+It supplies defaults for settings omitted from the project config, including when `--config` is used.
+Use `--no-user-config` to skip loading it.
 
 #### Format
 
-The config file uses the following format:
+The project and user-global config files use the same TOML format.
 
 ```toml
 # Define the custom order of derive attributes.
